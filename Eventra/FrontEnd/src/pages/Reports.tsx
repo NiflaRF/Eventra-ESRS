@@ -146,7 +146,7 @@ const Reports: React.FC = () => {
   // Calculate statistics from real data
   const totalEvents = eventStats?.total_events || 0;
   const totalParticipants = eventStats?.total_participants || 0;
-  const averageParticipants = eventStats?.avg_participants || 0;
+  const averageParticipants = Math.round(eventStats?.avg_participants || 0);
 
   return (
     <Layout showSidebar={true} backgroundImage="/Wrd.jpg">

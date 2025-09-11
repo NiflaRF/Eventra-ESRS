@@ -1310,9 +1310,17 @@ const AdminTools: React.FC = () => {
                     <h3 className="text-xl font-bold text-white mb-2">{approval.title}</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-white/80 mb-3">
-                      <div><span className="font-medium">Requester:</span> {approval.requester}</div>
-                      <div><span className="font-medium">Email:</span> {approval.requestedBy}</div>
-                      <div><span className="font-medium">Venue:</span> {approval.venue}</div>
+                      {/* Only show Requester and Email for venue booking requests */}
+                      {approval.type === 'booking' && (
+                        <>
+                          <div><span className="font-medium">Requester:</span> {approval.requester}</div>
+                          <div><span className="font-medium">Email:</span> {approval.requestedBy}</div>
+                        </>
+                      )}
+                      {/* Only show Venue for venue booking requests */}
+                      {approval.type === 'booking' && (
+                        <div><span className="font-medium">Venue:</span> {approval.venue}</div>
+                      )}
                       <div><span className="font-medium">Date:</span> {approval.date}</div>
                     </div>
                     
@@ -1402,13 +1410,16 @@ const AdminTools: React.FC = () => {
                       <X size={16} className="mr-2" />
                       Reject
                     </button>
-                    <button 
-                      onClick={() => handleViewDetails(approval)}
-                      className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-medium flex items-center hover:bg-white/20 transition-colors border border-white/20"
-                    >
-                      <Eye size={16} className="mr-2" />
-                      View Details
-                    </button>
+                    {/* Only show View Details for event-plan type (event planning approval queue) */}
+                    {approval.type === 'event-plan' && (
+                      <button 
+                        onClick={() => handleViewDetails(approval)}
+                        className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-medium flex items-center hover:bg-white/20 transition-colors border border-white/20"
+                      >
+                        <Eye size={16} className="mr-2" />
+                        View Details
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1887,10 +1898,12 @@ const AdminTools: React.FC = () => {
                           <span className="font-medium text-white">Email:</span>
                           <div className="text-white/90 mt-1">{selectedViewApproval.requestedBy}</div>
                         </div>
-                        <div className="mb-3">
-                          <span className="font-medium text-white">Venue:</span>
-                          <div className="text-white/90 mt-1">{selectedViewApproval.venue}</div>
-                        </div>
+                        {selectedViewApproval.type === 'booking' && (
+                          <div className="mb-3">
+                            <span className="font-medium text-white">Venue:</span>
+                            <div className="text-white/90 mt-1">{selectedViewApproval.venue}</div>
+                          </div>
+                        )}
                         <div className="mb-3">
                           <span className="font-medium text-white">Date:</span>
                           <div className="text-white/90 mt-1">{selectedViewApproval.date}</div>
@@ -2445,12 +2458,16 @@ const AdminTools: React.FC = () => {
                       <div className="mb-2">
                         <span className="font-medium">Title:</span> {selectedApproveApproval.title}
                       </div>
-                      <div className="mb-2">
-                        <span className="font-medium">Requester:</span> {selectedApproveApproval.requester}
-                      </div>
-                      <div className="mb-2">
-                        <span className="font-medium">Venue:</span> {selectedApproveApproval.venue}
-                      </div>
+                      {selectedApproveApproval.type === 'booking' && (
+                        <>
+                          <div className="mb-2">
+                            <span className="font-medium">Requester:</span> {selectedApproveApproval.requester}
+                          </div>
+                          <div className="mb-2">
+                            <span className="font-medium">Venue:</span> {selectedApproveApproval.venue}
+                          </div>
+                        </>
+                      )}
                       <div className="mb-2">
                         <span className="font-medium">Date:</span> {selectedApproveApproval.date}
                       </div>
@@ -2471,19 +2488,21 @@ const AdminTools: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <label className="block font-semibold mb-1 text-white">Email Notification:</label>
-                    <input
-                      type="email"
-                      value={approvalEmail}
-                      onChange={(e) => setApprovalEmail(e.target.value)}
-                      className="w-full border border-gray-600 rounded-md p-2 bg-gray-800/60 text-white placeholder-gray-300"
-                      placeholder="Email address for notification"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      This email will receive the approval notification
-                    </p>
-                  </div>
+                  {selectedApproveApproval.type === 'booking' && (
+                    <div className="mb-4">
+                      <label className="block font-semibold mb-1 text-white">Email Notification:</label>
+                      <input
+                        type="email"
+                        value={approvalEmail}
+                        onChange={(e) => setApprovalEmail(e.target.value)}
+                        className="w-full border border-gray-600 rounded-md p-2 bg-gray-800/60 text-white placeholder-gray-300"
+                        placeholder="Email address for notification"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        This email will receive the approval notification
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mb-6">
                     <label className="block font-semibold mb-1 text-white">Approval Comment (Optional):</label>
@@ -2496,11 +2515,11 @@ const AdminTools: React.FC = () => {
                         ? "Add comments about services requested, approval letters, or any special instructions..." 
                         : "Add any additional comments or instructions..."}
                     />
-                    <p className="text-xs text-gray-400 mt-1">
-                      {selectedApproveApproval.type === 'event-plan' 
-                        ? "This comment will be included in the email notification about your event planning approval"
-                        : "This comment will be included in the email notification"}
-                    </p>
+                    {selectedApproveApproval.type === 'booking' && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        This comment will be included in the email notification
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3">
@@ -2551,31 +2570,37 @@ const AdminTools: React.FC = () => {
                       <div className="mb-2">
                         <span className="font-medium">Title:</span> {selectedRejectionApproval.title}
                       </div>
-                      <div className="mb-2">
-                        <span className="font-medium">Requester:</span> {selectedRejectionApproval.requester}
-                      </div>
-                      <div className="mb-2">
-                        <span className="font-medium">Venue:</span> {selectedRejectionApproval.venue}
-                      </div>
+                      {selectedRejectionApproval.type === 'booking' && (
+                        <>
+                          <div className="mb-2">
+                            <span className="font-medium">Requester:</span> {selectedRejectionApproval.requester}
+                          </div>
+                          <div className="mb-2">
+                            <span className="font-medium">Venue:</span> {selectedRejectionApproval.venue}
+                          </div>
+                        </>
+                      )}
                       <div>
                         <span className="font-medium">Date:</span> {selectedRejectionApproval.date}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <label className="block font-semibold mb-1 text-white">Email Notification:</label>
-                    <input
-                      type="email"
-                      value={rejectionEmail}
-                      onChange={(e) => setRejectionEmail(e.target.value)}
-                      className="w-full border border-gray-600 rounded-md p-2 bg-gray-800/60 text-white placeholder-gray-300"
-                      placeholder="Email address for notification"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      This email will receive the rejection notification
-                    </p>
-                  </div>
+                  {selectedRejectionApproval.type === 'booking' && (
+                    <div className="mb-4">
+                      <label className="block font-semibold mb-1 text-white">Email Notification:</label>
+                      <input
+                        type="email"
+                        value={rejectionEmail}
+                        onChange={(e) => setRejectionEmail(e.target.value)}
+                        className="w-full border border-gray-600 rounded-md p-2 bg-gray-800/60 text-white placeholder-gray-300"
+                        placeholder="Email address for notification"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        This email will receive the rejection notification
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mb-6">
                     <label className="block font-semibold mb-1 text-white">Rejection Comment <span className="text-red-500">*</span></label>
@@ -2586,9 +2611,11 @@ const AdminTools: React.FC = () => {
                       onChange={(e) => setRejectionComment(e.target.value)}
                       placeholder="Please provide a detailed reason for rejection..."
                     />
-                    <p className="text-xs text-gray-400 mt-1">
-                      This comment will be included in the email notification
-                    </p>
+                    {selectedRejectionApproval.type === 'booking' && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        This comment will be included in the email notification
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3">
