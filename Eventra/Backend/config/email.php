@@ -65,7 +65,11 @@ class EmailService {
             $logMessage .= "Attachments: " . count($attachments) . "\n";
             
             foreach ($attachments as $attachment) {
-                $logMessage .= "- " . ($attachment['file_name'] ?? basename($attachment['file_path'])) . "\n";
+                $fileName = $attachment['file_name'] ?? basename($attachment['file_path'] ?? 'unknown');
+                $filePath = $attachment['file_path'] ?? 'unknown';
+                $fileExists = isset($attachment['file_path']) && file_exists($attachment['file_path']) ? 'EXISTS' : 'NOT FOUND';
+                $logMessage .= "- {$fileName} ({$fileExists})\n";
+                $logMessage .= "  Path: {$filePath}\n";
             }
             
             error_log($logMessage);
@@ -76,7 +80,13 @@ class EmailService {
                 'recipient' => $toEmail,
                 'subject' => $subject,
                 'attachments_count' => count($attachments),
-                'mock_service' => true
+                'mock_service' => true,
+                'attachments' => array_map(function($att) {
+                    return [
+                        'name' => $att['file_name'] ?? basename($att['file_path'] ?? 'unknown'),
+                        'exists' => isset($att['file_path']) && file_exists($att['file_path'])
+                    ];
+                }, $attachments)
             ];
         }
         
@@ -97,14 +107,36 @@ class EmailService {
             $this->mailer->Body = $body;
             $this->mailer->AltBody = $this->stripHtml($body);
             
+            error_log("📎 Processing " . count($attachments) . " attachments for email to: {$toEmail}");
+            
+            $attachedCount = 0;
             foreach ($attachments as $attachment) {
                 if (isset($attachment['file_path']) && file_exists($attachment['file_path'])) {
-                    $this->mailer->addAttachment(
-                        $attachment['file_path'], 
-                        $attachment['file_name'] ?? basename($attachment['file_path'])
-                    );
+                    $fileName = $attachment['file_name'] ?? basename($attachment['file_path']);
+                    $fileSize = filesize($attachment['file_path']);
+                    
+                    try {
+                        // Add attachment with proper MIME type and disposition for PDF
+                        $this->mailer->addStringAttachment(
+                            file_get_contents($attachment['file_path']),
+                            $fileName,
+                            'base64',
+                            'application/pdf',
+                            'attachment'
+                        );
+                        
+                        $attachedCount++;
+                        error_log("✅ Successfully added PDF attachment: {$fileName} from {$attachment['file_path']} (Size: {$fileSize} bytes)");
+                    } catch (Exception $e) {
+                        error_log("❌ Failed to add attachment {$fileName}: " . $e->getMessage());
+                    }
+                } else {
+                    $filePath = $attachment['file_path'] ?? 'unknown';
+                    error_log("❌ Attachment file not found: {$filePath}");
                 }
             }
+            
+            error_log("📧 Sending email with {$attachedCount} successfully attached files");
             
             $this->mailer->send();
             

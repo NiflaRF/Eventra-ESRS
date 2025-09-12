@@ -2,7 +2,26 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+hea                <p>The following signed approval letters are attached to this email as PDF files. You can download them directly from your email client:</p>
+                
+                <div class='letter-list'>";
+        
+        $letterCount = count($signedLetters);
+        foreach ($signedLetters as $letter) {
+            $roleName = $this->getRoleDisplayName($letter['role']);
+            $fileName = $letter['file_name'] ?? 'Approval Letter';
+            $body .= "
+                    <div class='letter-item'>
+                        <strong>✅ {$roleName} Approval Letter</strong><br>
+                        <small>📎 File: {$fileName}</small><br>
+                        Status: Approved and Signed
+                    </div>";
+        }
+        
+        $body .= "
+                </div>
+                
+                <p><strong>📎 Total Attachments: {$letterCount} PDF files</strong></p>";ol-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
@@ -13,9 +32,6 @@ require_once '../../config/email.php';
 
 $database = new Database();
 $conn = $database->getConnection();
-
-// Initialize email service
-$emailService = new EmailService();
 
 class SignedLettersEmailService {
     private $conn;
@@ -38,19 +54,13 @@ class SignedLettersEmailService {
                 ];
             }
             
-            // Debug logging
             error_log("Found " . count($signedLetters) . " signed letters for event plan ID: {$eventPlanId}");
             foreach ($signedLetters as $letter) {
-                error_log("Letter: {$letter['role']} - File: {$letter['file_name']} - Path: {$letter['file_path']} - Exists: " . (file_exists($letter['file_path']) ? 'YES' : 'NO'));
-                if (file_exists($letter['file_path'])) {
-                    error_log("File size: " . filesize($letter['file_path']) . " bytes");
-                }
+                error_log("Letter: {$letter['role']} - File: {$letter['file_name']} - Path: {$letter['file_path']}");
             }
             
             $emailSubject = "Event Plan Approved - Signed Letters: {$eventTitle}";
             $emailBody = $this->generateEmailBody($eventTitle, $requesterName, $signedLetters);
-            
-            error_log("About to send email with " . count($signedLetters) . " attachments to: {$userEmail}");
             
             $emailResult = $this->emailService->sendEmailWithAttachments(
                 $userEmail,
@@ -59,9 +69,13 @@ class SignedLettersEmailService {
                 $signedLetters
             );
             
-            error_log("Email service response: " . json_encode($emailResult));
-            
             if ($emailResult['success']) {
+                try {
+                    $this->logEmailSent($eventPlanId, $userEmail, $signedLetters);
+                } catch (Exception $e) {
+                    error_log("Email logs table not available yet: " . $e->getMessage());
+                }
+                
                 return [
                     'success' => true,
                     'message' => 'Signed letters sent successfully',
@@ -74,6 +88,7 @@ class SignedLettersEmailService {
                     }, $signedLetters)
                 ];
             } else {
+                error_log("Failed to send email: " . $emailResult['message']);
                 return [
                     'success' => false,
                     'message' => 'Failed to send email: ' . $emailResult['message']
@@ -101,8 +116,7 @@ class SignedLettersEmailService {
                   AND sl.letter_type = 'approval'
                   AND sl.file_path IS NOT NULL 
                   AND sl.file_path != ''
-                  AND sl.file_name IS NOT NULL
-                  AND sl.file_name != ''";
+                  AND sl.status = 'signed'";
         
         $stmt = $this->conn->prepare($query);
         $stmt->execute([$eventPlanId]);
@@ -118,7 +132,7 @@ class SignedLettersEmailService {
                 $letters[] = [
                     'role' => $row['from_role'],
                     'content' => $row['letter_content'],
-                    'file_path' => $absolutePath,
+                    'file_path' => $absolutePath, // Use absolute path for email attachment
                     'file_name' => $row['file_name'],
                     'letter_type' => $row['letter_type']
                 ];
@@ -131,46 +145,77 @@ class SignedLettersEmailService {
     }
     
     private function generateEmailBody($eventTitle, $requesterName, $signedLetters) {
-        $letterCount = count($signedLetters);
-        
-        $body = "<html><head><style>
+        $body = "
+        <html>
+        <head>
+            <style>
                 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                 .header { background-color: #f8f9fa; padding: 20px; border-radius: 5px; }
                 .content { padding: 20px; }
                 .footer { background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; color: #666; }
                 .letter-list { margin: 20px 0; }
                 .letter-item { background-color: #e9ecef; padding: 10px; margin: 10px 0; border-radius: 3px; }
-                .attachment-info { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8; }
-                </style></head><body>";
-        
-        $body .= "<div class='header'><h2>🎉 Event Plan Approved!</h2>";
-        $body .= "<p><strong>Event:</strong> {$eventTitle}</p>";
-        $body .= "<p><strong>Requester:</strong> {$requesterName}</p></div>";
-        
-        $body .= "<div class='content'><p>Dear {$requesterName},</p>";
-        $body .= "<p>Congratulations! Your event plan <strong>{$eventTitle}</strong> has been approved by all required authorities.</p>";
-        
-        $body .= "<p>The following signed approval letters are attached to this email as PDF files:</p>";
-        $body .= "<div class='letter-list'>";
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h2>🎉 Event Plan Approved!</h2>
+                <p><strong>Event:</strong> {$eventTitle}</p>
+                <p><strong>Requester:</strong> {$requesterName}</p>
+            </div>
+            
+            <div class='content'>
+                <p>Dear {$requesterName},</p>
+                
+                <p>Congratulations! Your event plan <strong>{$eventTitle}</strong> has been approved by all required authorities.</p>
+                
+                <p>The following signed approval letters are attached to this email as PDF files. You can download them directly from your email client:</p>
+                
+                <div class='letter-list'>";
         
         foreach ($signedLetters as $letter) {
             $roleName = $this->getRoleDisplayName($letter['role']);
             $fileName = $letter['file_name'] ?? 'Approval Letter';
-            $body .= "<div class='letter-item'>";
-            $body .= "<strong>✅ {$roleName} Approval Letter</strong><br>";
-            $body .= "<small>📎 Attachment: {$fileName}</small><br>";
-            $body .= "Status: Approved and Signed";
-            $body .= "</div>";
+            $body .= "
+                    <div class='letter-item'>
+                        <strong>✅ {$roleName} Approval Letter</strong><br>
+                        <small>File: {$fileName}</small><br>
+                        Status: Approved and Signed
+                    </div>";
         }
         
-        $body .= "</div>";
-        
-        $body .= "<p>Best regards,<br><strong>Event Management System</strong><br>University Administration</p></div>";
-        
-        $body .= "<div class='footer'>";
-        $body .= "<p>This email contains {$letterCount} PDF attachment(s). Please ensure you download all attachments.</p>";
-        $body .= "<p>Generated on: " . date('F j, Y \a\t g:i A') . "</p>";
-        $body .= "</div></body></html>";
+        $body .= "
+                </div>
+                
+                <p><strong>📎 How to Download Your Letters:</strong></p>
+                <ul>
+                    <li>All approval letters are attached as PDF files to this email</li>
+                    <li>Look for the attachment icon (📎) in your email client</li>
+                    <li>Click on each attachment to download or open the PDF</li>
+                    <li>Save the letters to your device for your records</li>
+                </ul>
+                
+                <p><strong>Next Steps:</strong></p>
+                <ul>
+                    <li>Download and review all attached approval letters</li>
+                    <li>Contact the Service Provider to coordinate event services</li>
+                    <li>Ensure all requirements are met before the event date</li>
+                    <li>Keep these approval letters for your records</li>
+                </ul>
+                
+                <p>If you have any questions or need assistance, please contact the administration office.</p>
+                
+                <p>Best regards,<br>
+                <strong>Event Management System</strong><br>
+                University Administration</p>
+            </div>
+            
+            <div class='footer'>
+                <p>This is an automated message from the Event Management System. Please do not reply to this email.</p>
+                <p>Generated on: " . date('F j, Y \a\t g:i A') . "</p>
+            </div>
+        </body>
+        </html>";
         
         return $body;
     }
@@ -184,6 +229,21 @@ class SignedLettersEmailService {
         ];
         
         return $roleNames[$role] ?? ucfirst(str_replace('-', ' ', $role));
+    }
+    
+    private function logEmailSent($eventPlanId, $userEmail, $signedLetters) {
+        $query = "INSERT INTO email_logs (
+                    event_plan_id, 
+                    recipient_email, 
+                    email_type, 
+                    letters_sent, 
+                    sent_at, 
+                    status
+                  ) VALUES (?, ?, 'signed_letters', ?, NOW(), 'sent')";
+        
+        $stmt = $this->conn->prepare($query);
+        $lettersJson = json_encode($signedLetters);
+        $stmt->execute([$eventPlanId, $userEmail, $lettersJson]);
     }
 }
 
@@ -236,4 +296,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'message' => 'Method not allowed'
     ]);
 }
-?> 
+?>
