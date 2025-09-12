@@ -1,4 +1,9 @@
 <?php
+// Suppress all output and clean buffer
+ob_start();
+ini_set('display_errors', 0);
+error_reporting(0);
+
 require_once '../../config/cors.php';
 require_once '../../config/database.php';
 require_once '../../models/Venue.php';
@@ -6,7 +11,11 @@ require_once '../../models/EventPlan.php';
 require_once '../../models/Booking.php';
 require_once '../../utils/JWTUtil.php';
 
-header('Content-Type: application/json');
+// Clean all output
+ob_end_clean();
+ob_start();
+
+header('Content-Type: application/json; charset=utf-8');
 
 $database = new Database();
 $db = $database->getConnection();
@@ -20,9 +29,11 @@ if (!$payload) {
     exit();
 }
 
-if ($payload['role'] !== 'super-admin') {
+// Allow multiple admin roles to access reports
+$allowedRoles = ['super-admin', 'administration', 'vice-chancellor'];
+if (!in_array($payload['role'], $allowedRoles)) {
     http_response_code(403);
-    echo json_encode(array("success" => false, "message" => "Access denied. Only super-admin can access reports."));
+    echo json_encode(array("success" => false, "message" => "Access denied. Admin privileges required to access reports."));
     exit();
 }
 
@@ -166,13 +177,19 @@ try {
     );
     
     http_response_code(200);
-    echo json_encode($response);
+    ob_clean();
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
     
 } catch (Exception $e) {
     http_response_code(500);
+    ob_clean();
     echo json_encode(array(
         "success" => false,
         "message" => "Error generating venue analytics: " . $e->getMessage()
-    ));
+    ), JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
 }
 ?>

@@ -1,12 +1,30 @@
 <?php
-require_once '../../config/cors.php';
+// Suppress all output and clean buffer
+ob_start();
+ini_set('display_errors', 0);
+error_reporting(0);
+
+require_once '../} catch (Exception $e) {
+    http_response_code(500);
+    ob_clean();
+    echo json_encode(array(
+        "success" => false,
+        "message" => "Error generating event reports: " . $e->getMessage()
+    ), JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
+}cors.php';
 require_once '../../config/database.php';
 require_once '../../models/EventPlan.php';
-require_once '../../models/User.php';
+require_once '../../models/Booking.php';
 require_once '../../models/Venue.php';
 require_once '../../utils/JWTUtil.php';
 
-header('Content-Type: application/json');
+// Clean all output
+ob_end_clean();
+ob_start();
+
+header('Content-Type: application/json; charset=utf-8');
 
 $database = new Database();
 $db = $database->getConnection();
@@ -20,9 +38,11 @@ if (!$payload) {
     exit();
 }
 
-if ($payload['role'] !== 'super-admin') {
+// Allow multiple admin roles to access reports
+$allowedRoles = ['super-admin', 'administration', 'vice-chancellor'];
+if (!in_array($payload['role'], $allowedRoles)) {
     http_response_code(403);
-    echo json_encode(array("success" => false, "message" => "Access denied. Only super-admin can access reports."));
+    echo json_encode(array("success" => false, "message" => "Access denied. Admin privileges required to access reports."));
     exit();
 }
 
@@ -35,21 +55,19 @@ $limit = $_GET['limit'] ?? 50;
 $offset = $_GET['offset'] ?? 0;
 
 try {
-    $baseQuery = "
+    // Build the query for event reports
+    $query = "
         SELECT 
             ep.id,
             ep.title,
             ep.type as event_type,
-            ep.organizer as description,
-            ep.participants as expected_participants,
+            ep.organizer,
+            ep.date,
+            ep.time,
+            ep.participants,
             ep.status,
             ep.created_at,
-            ep.updated_at,
-            u.name as organizer_name,
-            u.email as organizer_email,
-            u.role as organizer_role,
-            'N/A' as venue_name,
-            'N/A' as venue_capacity
+            u.name as created_by
         FROM event_plans ep
         LEFT JOIN users u ON ep.user_id = u.id
         WHERE DATE(ep.created_at) BETWEEN ? AND ?
@@ -58,41 +76,35 @@ try {
     $params = [$startDate, $endDate];
     
     if ($eventType && $eventType !== 'all') {
-        $baseQuery .= " AND ep.title LIKE ?";
-        $params[] = "%$eventType%";
-    }
-    
-    if ($venueId && $venueId !== 'all') {
-        $baseQuery .= " AND ep.venue_id = ?";
-        $params[] = $venueId;
+        $query .= " AND ep.type = ?";
+        $params[] = $eventType;
     }
     
     if ($status && $status !== 'all') {
-        $baseQuery .= " AND ep.status = ?";
+        $query .= " AND ep.status = ?";
         $params[] = $status;
     }
     
-    $baseQuery .= " ORDER BY ep.created_at DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+    $query .= " ORDER BY ep.created_at DESC LIMIT ? OFFSET ?";
+    $params[] = (int)$limit;
+    $params[] = (int)$offset;
     
-    $stmt = $db->prepare($baseQuery);
+    $stmt = $db->prepare($query);
     $stmt->execute($params);
     $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Get total count for pagination
     $countQuery = "
-        SELECT COUNT(*) as total FROM event_plans ep
+        SELECT COUNT(*) as total
+        FROM event_plans ep
         WHERE DATE(ep.created_at) BETWEEN ? AND ?
     ";
     
     $countParams = [$startDate, $endDate];
     
     if ($eventType && $eventType !== 'all') {
-        $countQuery .= " AND ep.title LIKE ?";
-        $countParams[] = "%$eventType%";
-    }
-    
-    if ($venueId && $venueId !== 'all') {
-        $countQuery .= " AND ep.venue_id = ?";
-        $countParams[] = $venueId;
+        $countQuery .= " AND ep.type = ?";
+        $countParams[] = $eventType;
     }
     
     if ($status && $status !== 'all') {
@@ -104,41 +116,13 @@ try {
     $stmt->execute($countParams);
     $totalCount = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     
-    $formattedEvents = array();
-    foreach ($events as $event) {
-        $formattedEvents[] = array(
-            'id' => $event['id'],
-            'title' => $event['title'],
-            'event_type' => $event['event_type'],
-            'description' => $event['description'],
-            'expected_participants' => $event['expected_participants'],
-            'status' => $event['status'],
-            'created_at' => $event['created_at'],
-            'updated_at' => $event['updated_at'],
-            'organizer' => array(
-                'name' => $event['organizer_name'],
-                'email' => $event['organizer_email'],
-                'role' => $event['organizer_role']
-            ),
-            'venue' => array(
-                'name' => $event['venue_name'],
-                'capacity' => $event['venue_capacity']
-            ),
-            'utilization_rate' => $event['venue_capacity'] > 0 ? 
-                round((1 / $event['venue_capacity']) * 100, 1) : 0
-        );
-    }
-    
     $response = array(
         "success" => true,
         "data" => array(
-            "events" => $formattedEvents,
-            "pagination" => array(
-                "total" => $totalCount,
-                "limit" => (int)$limit,
-                "offset" => (int)$offset,
-                "pages" => ceil($totalCount / $limit)
-            )
+            "events" => $events,
+            "total_count" => (int)$totalCount,
+            "limit" => (int)$limit,
+            "offset" => (int)$offset
         ),
         "filters" => array(
             "start_date" => $startDate,
@@ -150,13 +134,19 @@ try {
     );
     
     http_response_code(200);
-    echo json_encode($response);
+    ob_clean(); // Clean any remaining output
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
     
 } catch (Exception $e) {
     http_response_code(500);
+    ob_clean();
     echo json_encode(array(
         "success" => false,
-        "message" => "Error generating event reports: " . $e->getMessage()
-    ));
+        "message" => "Error generating statistics: " . $e->getMessage()
+    ), JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
 }
 ?>

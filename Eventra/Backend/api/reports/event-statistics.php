@@ -1,4 +1,9 @@
 <?php
+// Suppress all output and clean buffer
+ob_start();
+ini_set('display_errors', 0);
+error_reporting(0);
+
 require_once '../../config/cors.php';
 require_once '../../config/database.php';
 require_once '../../models/EventPlan.php';
@@ -6,7 +11,11 @@ require_once '../../models/Booking.php';
 require_once '../../models/Venue.php';
 require_once '../../utils/JWTUtil.php';
 
-header('Content-Type: application/json');
+// Clean all output
+ob_end_clean();
+ob_start();
+
+header('Content-Type: application/json; charset=utf-8');
 
 $database = new Database();
 $db = $database->getConnection();
@@ -20,9 +29,11 @@ if (!$payload) {
     exit();
 }
 
-if ($payload['role'] !== 'super-admin') {
+// Allow multiple admin roles to access reports
+$allowedRoles = ['super-admin', 'administration', 'vice-chancellor'];
+if (!in_array($payload['role'], $allowedRoles)) {
     http_response_code(403);
-    echo json_encode(array("success" => false, "message" => "Access denied. Only super-admin can access reports."));
+    echo json_encode(array("success" => false, "message" => "Access denied. Admin privileges required to access reports."));
     exit();
 }
 
@@ -36,18 +47,20 @@ try {
     
     $overallStats = array();
     
+    // Count total events
     $query = "SELECT COUNT(*) as total FROM event_plans WHERE DATE(created_at) BETWEEN ? AND ?";
     $params = [$startDate, $endDate];
     
     if ($eventType && $eventType !== 'all') {
-        $query .= " AND title LIKE ?";
-        $params[] = "%$eventType%";
+        $query .= " AND type = ?";
+        $params[] = $eventType;
     }
     
     $stmt = $db->prepare($query);
     $stmt->execute($params);
     $overallStats['total_events'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     
+    // Count total bookings
     $query = "SELECT COUNT(*) as total FROM bookings WHERE DATE(created_at) BETWEEN ? AND ?";
     $params = [$startDate, $endDate];
     
@@ -60,27 +73,30 @@ try {
     $stmt->execute($params);
     $overallStats['total_bookings'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     
+    // Sum total participants
     $query = "SELECT SUM(participants) as total FROM event_plans WHERE DATE(created_at) BETWEEN ? AND ?";
     $params = [$startDate, $endDate];
     
     if ($eventType && $eventType !== 'all') {
-        $query .= " AND title LIKE ?";
-        $params[] = "%$eventType%";
+        $query .= " AND type = ?";
+        $params[] = $eventType;
     }
     
     $stmt = $db->prepare($query);
     $stmt->execute($params);
     $overallStats['total_participants'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
     
+    // Calculate average participants
     $overallStats['avg_participants'] = $overallStats['total_events'] > 0 ? 
         round($overallStats['total_participants'] / $overallStats['total_events'], 1) : 0;
     
+    // Status distribution
     $statusQuery = "SELECT status, COUNT(*) as count FROM event_plans WHERE DATE(created_at) BETWEEN ? AND ?";
     $params = [$startDate, $endDate];
     
     if ($eventType && $eventType !== 'all') {
-        $statusQuery .= " AND title LIKE ?";
-        $params[] = "%$eventType%";
+        $statusQuery .= " AND type = ?";
+        $params[] = $eventType;
     }
     
     $statusQuery .= " GROUP BY status";
@@ -88,33 +104,21 @@ try {
     $stmt->execute($params);
     $overallStats['status_distribution'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $typeQuery = "SELECT ep.type as event_type, COUNT(*) as count FROM event_plans ep WHERE DATE(ep.created_at) BETWEEN ? AND ?";
+    // Type distribution
+    $typeQuery = "SELECT type as event_type, COUNT(*) as count FROM event_plans WHERE DATE(created_at) BETWEEN ? AND ?";
     $params = [$startDate, $endDate];
     
-    if ($venueId && $venueId !== 'all') {
-        $typeQuery .= " AND ep.type LIKE ?";
-        $params[] = "%$venueId%";
+    if ($eventType && $eventType !== 'all') {
+        $typeQuery .= " AND type = ?";
+        $params[] = $eventType;
     }
     
-    $typeQuery .= " GROUP BY ep.type";
+    $typeQuery .= " GROUP BY type";
     $stmt = $db->prepare($typeQuery);
     $stmt->execute($params);
     $overallStats['type_distribution'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $typeQuery = "
-        SELECT 
-            ep.type as event_type,
-            COUNT(*) as count
-        FROM event_plans ep
-        WHERE DATE(ep.created_at) BETWEEN ? AND ?
-        GROUP BY ep.type
-        ORDER BY count DESC
-    ";
-    
-    $stmt = $db->prepare($typeQuery);
-    $stmt->execute([$startDate, $endDate]);
-    $overallStats['type_distribution'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+    // Monthly trend analysis
     $trendQuery = "
         SELECT 
             DATE_FORMAT(created_at, '%Y-%m') as month,
@@ -130,6 +134,7 @@ try {
     $stmt->execute();
     $overallStats['monthly_trend'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Top events by participants
     $topEventsQuery = "
         SELECT 
             title,
@@ -144,37 +149,22 @@ try {
     ";
     
     $params = [$startDate, $endDate];
-    if ($eventType && $eventType !== 'all') {
-        $topEventsQuery .= " AND title LIKE ?";
-        $params[] = "%$eventType%";
-    }
-    
     $stmt = $db->prepare($topEventsQuery);
     $stmt->execute($params);
     $overallStats['top_events'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Approval statistics
     $approvalQuery = "
         SELECT 
-            'pending' as status,
+            status,
             COUNT(*) as count
         FROM event_plans 
-        WHERE status = 'pending' AND DATE(created_at) BETWEEN ? AND ?
-        UNION ALL
-        SELECT 
-            'approved' as status,
-            COUNT(*) as count
-        FROM event_plans 
-        WHERE status = 'approved' AND DATE(created_at) BETWEEN ? AND ?
-        UNION ALL
-        SELECT 
-            'rejected' as status,
-            COUNT(*) as count
-        FROM event_plans 
-        WHERE status = 'rejected' AND DATE(created_at) BETWEEN ? AND ?
+        WHERE DATE(created_at) BETWEEN ? AND ?
+        GROUP BY status
     ";
     
     $stmt = $db->prepare($approvalQuery);
-    $stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
+    $stmt->execute([$startDate, $endDate]);
     $overallStats['approval_stats'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $response = array(
@@ -189,13 +179,19 @@ try {
     );
     
     http_response_code(200);
-    echo json_encode($response);
+    ob_clean(); // Clean any remaining output
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
     
 } catch (Exception $e) {
     http_response_code(500);
+    ob_clean();
     echo json_encode(array(
         "success" => false,
         "message" => "Error generating statistics: " . $e->getMessage()
-    ));
+    ), JSON_UNESCAPED_UNICODE);
+    ob_end_flush();
+    exit();
 }
 ?>

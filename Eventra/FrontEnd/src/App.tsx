@@ -185,7 +185,7 @@ const App = () => (
             } />
             
             <Route path="/admin/reports" element={
-              <ProtectedRoute allowedRoles={['super-admin']}>
+              <ProtectedRoute allowedRoles={['super-admin', 'administration', 'vice-chancellor']}>
                 <Reports />
               </ProtectedRoute>
             } />

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { apiService } from '../services/api';
@@ -53,7 +52,19 @@ const Reports: React.FC = () => {
       });
       setEventStats(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch event statistics');
+      const errorMessage = err.message || 'Failed to fetch event statistics';
+      setError(errorMessage);
+      console.error('Event statistics error:', err);
+      
+      // Set fallback data
+      setEventStats({
+        total_events: 0,
+        total_participants: 0,
+        avg_participants: 0,
+        status_distribution: [],
+        type_distribution: [],
+        monthly_trend: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +83,15 @@ const Reports: React.FC = () => {
       });
       setEventReports(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch event reports');
+      const errorMessage = err.message || 'Failed to fetch event reports';
+      setError(errorMessage);
+      console.error('Event reports error:', err);
+      
+      // Set fallback data
+      setEventReports({
+        events: [],
+        total_count: 0
+      });
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +108,17 @@ const Reports: React.FC = () => {
       });
       setVenueAnalytics(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch venue analytics');
+      const errorMessage = err.message || 'Failed to fetch venue analytics';
+      setError(errorMessage);
+      console.error('Venue analytics error:', err);
+      
+      // Set fallback data
+      setVenueAnalytics({
+        total_venues: 0,
+        total_capacity: 0,
+        venue_usage: [],
+        popular_venues: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +134,17 @@ const Reports: React.FC = () => {
       });
       setUserAnalytics(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch user analytics');
+      const errorMessage = err.message || 'Failed to fetch user analytics';
+      setError(errorMessage);
+      console.error('User analytics error:', err);
+      
+      // Set fallback data
+      setUserAnalytics({
+        total_users: 0,
+        active_users: 0,
+        user_roles: [],
+        activity_trend: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +158,31 @@ const Reports: React.FC = () => {
     fetchVenueAnalytics();
     fetchUserAnalytics();
   }, [dateRange.start, dateRange.end, eventTypeFilter, venueFilter]);
+
+  // Initialize event types and venues on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Set default event types
+        setEventTypes(['Conference', 'Cultural Events', 'Sports Events', 'Social Events', 'Club Events']);
+        
+        // Try to fetch venues for the filter
+        try {
+          const venuesResponse = await apiService.getVenues();
+          if (venuesResponse?.data?.venues) {
+            setVenues(venuesResponse.data.venues);
+          }
+        } catch (venueError) {
+          console.warn('Could not load venues for filter:', venueError);
+          setVenues([]);
+        }
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      }
+    };
+
+    initializeData();
+  }, []);
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, index) => (
@@ -157,9 +221,12 @@ const Reports: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-white">Reports & Analytics</h1>
-                
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mt-2">
+                    <p className="text-red-200 text-sm">{error}</p>
+                  </div>
+                )}
               </div>
-              {/* Removed Refresh, Export PDF, and Export Excel buttons */}
             </div>
 
             {/* Filters */}
