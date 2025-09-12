@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 import { 
   Search, 
   Filter, 
@@ -24,6 +25,8 @@ interface Venue {
   availability: string;
   restrictions: string;
   images: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 const VenueManagement: React.FC = () => {
@@ -33,50 +36,49 @@ const VenueManagement: React.FC = () => {
   const [minCapacity, setMinCapacity] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
 
-  // Mock venue data
-  const [venues, setVenues] = useState<Venue[]>([
-    {
-      id: '1',
-      name: 'E Block Main Auditorium',
-      capacity: 500,
-      location: 'Academic Block E',
-      type: 'Auditorium',
-      availability: 'Available',
-      restrictions: 'No food and drinks allowed',
-      images: ['/E1.jpg']
-    },
-    {
-      id: '2',
-      name: 'Technology Lecture Theater 1',
-      capacity: 250,
-      location: 'Technology Building',
-      type: 'Lecture Theater',
-      availability: 'Booked',
-      restrictions: 'Professional events only',
-      images: ['/Tecno.jpg']
-    },
-    {
-      id: '3',
-      name: 'Open Ground',
-      capacity: 1000,
-      location: 'Campus Premises',
-      type: 'Outdoor',
-      availability: 'Available',
-      restrictions: 'Weather dependent',
-      images: ['/Ground.jpg']
-    },
-    {
-      id: '4',
-      name: 'Namunukula Open Air Theater',
-      capacity: 700,
-      location: 'Campus Center',
-      type: 'Outdoor',
-      availability: 'Available',
-      restrictions: 'Weather dependent',
-      images: ['/Open Air Theater.jpg']
+  // Fetch venues from API
+  useEffect(() => {
+    fetchVenues();
+  }, []);
+
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 5000);
+      return () => clearTimeout(timer);
     }
-  ]);
+  }, [success]);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const fetchVenues = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const response = await apiService.getVenues();
+      
+      if (response.success) {
+        setVenues(response.data || []);
+      } else {
+        setError(response.message || 'Failed to fetch venues');
+      }
+    } catch (err: any) {
+      console.error('Error fetching venues:', err);
+      setError('Failed to fetch venues. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const [newVenue, setNewVenue] = useState<Partial<Venue>>({
     name: '',
@@ -136,35 +138,44 @@ const VenueManagement: React.FC = () => {
     return matchesSearch && matchesType && matchesCapacity;
   });
 
-  const handleAddVenue = () => {
+  const handleAddVenue = async () => {
     if (newVenue.name && newVenue.capacity && newVenue.location && newVenue.type) {
-      // Convert uploaded images to base64 strings for storage
-      const imageUrls = imagePreviewUrls.length > 0 ? imagePreviewUrls : ['/placeholder.svg'];
-      
-      const venue: Venue = {
-        id: Date.now().toString(),
-        name: newVenue.name,
-        capacity: newVenue.capacity,
-        location: newVenue.location,
-        type: newVenue.type,
-        availability: newVenue.availability || 'Available',
-        restrictions: newVenue.restrictions || '',
-        images: imageUrls
-      };
-      
-      setVenues([...venues, venue]);
-      setNewVenue({
-        name: '',
-        capacity: 0,
-        location: '',
-        type: '',
-        availability: 'Available',
-        restrictions: '',
-        images: []
-      });
-      setShowAddModal(false);
-      // Clear image state
-      clearImages();
+      try {
+        setError('');
+        
+        const venueData = {
+          name: newVenue.name,
+          capacity: newVenue.capacity,
+          location: newVenue.location,
+          type: newVenue.type,
+          availability: newVenue.availability || 'Available',
+          restrictions: newVenue.restrictions || '',
+          images: imagePreviewUrls.length > 0 ? imagePreviewUrls : ['/placeholder.svg']
+        };
+        
+        const response = await apiService.createVenue(venueData);
+        
+        if (response.success) {
+          setSuccess('Venue added successfully!');
+          await fetchVenues(); // Refresh the venues list
+          setNewVenue({
+            name: '',
+            capacity: 0,
+            location: '',
+            type: '',
+            availability: 'Available',
+            restrictions: '',
+            images: []
+          });
+          setShowAddModal(false);
+          clearImages();
+        } else {
+          setError(response.message || 'Failed to add venue');
+        }
+      } catch (err: any) {
+        console.error('Error adding venue:', err);
+        setError('Failed to add venue. Please try again.');
+      }
     }
   };
 
@@ -177,42 +188,66 @@ const VenueManagement: React.FC = () => {
     setShowAddModal(true);
   };
 
-  const handleUpdateVenue = () => {
+  const handleUpdateVenue = async () => {
     if (editingVenue && newVenue.name && newVenue.capacity && newVenue.location && newVenue.type) {
-      // Use uploaded images if any, otherwise keep existing images
-      const imageUrls = imagePreviewUrls.length > 0 ? imagePreviewUrls : editingVenue.images;
-      
-      const updatedVenue: Venue = {
-        ...editingVenue,
-        name: newVenue.name,
-        capacity: newVenue.capacity,
-        location: newVenue.location,
-        type: newVenue.type,
-        availability: newVenue.availability || 'Available',
-        restrictions: newVenue.restrictions || '',
-        images: imageUrls
-      };
-      
-      setVenues(venues.map(v => v.id === editingVenue.id ? updatedVenue : v));
-      setEditingVenue(null);
-      setNewVenue({
-        name: '',
-        capacity: 0,
-        location: '',
-        type: '',
-        availability: 'Available',
-        restrictions: '',
-        images: []
-      });
-      setShowAddModal(false);
-      // Clear image state
-      clearImages();
+      try {
+        setError('');
+        
+        const venueData = {
+          id: parseInt(editingVenue.id),
+          name: newVenue.name,
+          capacity: newVenue.capacity,
+          location: newVenue.location,
+          type: newVenue.type,
+          availability: newVenue.availability || 'Available',
+          restrictions: newVenue.restrictions || '',
+          images: imagePreviewUrls.length > 0 ? imagePreviewUrls : editingVenue.images
+        };
+        
+        const response = await apiService.updateVenue(venueData);
+        
+        if (response.success) {
+          setSuccess('Venue updated successfully!');
+          await fetchVenues(); // Refresh the venues list
+          setEditingVenue(null);
+          setNewVenue({
+            name: '',
+            capacity: 0,
+            location: '',
+            type: '',
+            availability: 'Available',
+            restrictions: '',
+            images: []
+          });
+          setShowAddModal(false);
+          clearImages();
+        } else {
+          setError(response.message || 'Failed to update venue');
+        }
+      } catch (err: any) {
+        console.error('Error updating venue:', err);
+        setError('Failed to update venue. Please try again.');
+      }
     }
   };
 
-  const handleDeleteVenue = (venueId: string) => {
+  const handleDeleteVenue = async (venueId: string) => {
     if (window.confirm('Are you sure you want to delete this venue?')) {
-      setVenues(venues.filter(v => v.id !== venueId));
+      try {
+        setError('');
+        
+        const response = await apiService.deleteVenue(parseInt(venueId));
+        
+        if (response.success) {
+          setSuccess('Venue deleted successfully!');
+          await fetchVenues(); // Refresh the venues list
+        } else {
+          setError(response.message || 'Failed to delete venue');
+        }
+      } catch (err: any) {
+        console.error('Error deleting venue:', err);
+        setError('Failed to delete venue. Please try again.');
+      }
     }
   };
 
@@ -236,6 +271,19 @@ const VenueManagement: React.FC = () => {
         style={{ backgroundColor: '#bd7880' }}
       >
         <div className="w-full max-w-6xl mx-auto px-4 md:px-8">
+          {/* Error and Success Messages */}
+          {error && (
+            <div className="bg-red-900/50 border border-red-500/30 rounded-xl p-4 mb-6">
+              <p className="text-sm text-red-100">{error}</p>
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-900/50 border border-green-500/30 rounded-xl p-4 mb-6">
+              <p className="text-sm text-green-100">{success}</p>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex flex-col items-center text-center w-full mb-8">
             <h1 className="text-5xl font-extrabold text-white mb-8">Venues</h1>
@@ -305,56 +353,65 @@ const VenueManagement: React.FC = () => {
           </div>
 
           {/* Venue Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredVenues.map(venue => (
-              <div key={venue.id} className="bg-black bg-opacity-40 rounded-xl shadow-none overflow-hidden flex flex-col">
-                <div className="relative">
-                  <img src={venue.images[0]} alt={venue.name} className="w-full h-56 object-cover" />
-                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold
-                    ${venue.availability.toLowerCase() === 'available' ? 'bg-green-900 bg-opacity-60 text-green-200' :
-                      venue.availability.toLowerCase() === 'booked' ? 'bg-red-900 bg-opacity-60 text-red-200' :
-                      'bg-yellow-900 bg-opacity-60 text-yellow-200'}`}>{venue.availability}</span>
-                </div>
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div className="mb-4">
-                    <div className="font-bold text-xl text-white mb-2">{venue.name}</div>
-                    <div className="flex items-center gap-2 text-sm text-gray-200 mb-1"><MapPin size={16} /> {venue.location}</div>
-                    <div className="flex items-center gap-2 text-sm text-gray-200 mb-1">Capacity: {venue.capacity}</div>
-                    <div className="flex items-center gap-2 text-sm text-gray-200 mb-1">Type: {venue.type}</div>
-                    <div className="text-xs text-gray-300 mt-2"><span className="font-semibold">Restrictions:</span> {venue.restrictions}</div>
-                  </div>
-                  <div className="flex gap-2 mt-auto">
-                    {user?.role === 'super-admin' ? (
-                      <>
-                        <button 
-                          onClick={() => handleEditVenue(venue)}
-                          className="bg-yellow-900 bg-opacity-80 text-white px-3 py-2 rounded-lg font-medium hover:bg-yellow-800 transition-colors flex items-center justify-center"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteVenue(venue.id)}
-                          className="bg-red-900 bg-opacity-80 text-white px-3 py-2 rounded-lg font-medium hover:bg-red-800 transition-colors flex items-center justify-center"
-                        >
-                          <Trash size={16} />
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredVenues.length === 0 && (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-white text-lg">Loading venues...</div>
+            </div>
+          ) : filteredVenues.length === 0 ? (
             <div className="text-center py-12">
               <MapPin size={48} className="mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No venues found</h3>
               <p className="text-gray-600">Try adjusting your search criteria</p>
             </div>
-          )}
-
-          {/* Add/Edit Venue Modal */}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredVenues.map(venue => (
+                <div key={venue.id} className="bg-black bg-opacity-40 rounded-xl shadow-none overflow-hidden flex flex-col">
+                  <div className="relative">
+                    <img 
+                      src={venue.images && venue.images.length > 0 ? venue.images[0] : '/placeholder.svg'} 
+                      alt={venue.name} 
+                      className="w-full h-56 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = '/placeholder.svg';
+                      }}
+                    />
+                    <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold
+                      ${venue.availability.toLowerCase() === 'available' ? 'bg-green-900 bg-opacity-60 text-green-200' :
+                        venue.availability.toLowerCase() === 'booked' ? 'bg-red-900 bg-opacity-60 text-red-200' :
+                        'bg-yellow-900 bg-opacity-60 text-yellow-200'}`}>{venue.availability}</span>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div className="mb-4">
+                      <div className="font-bold text-xl text-white mb-2">{venue.name}</div>
+                      <div className="flex items-center gap-2 text-sm text-gray-200 mb-1"><MapPin size={16} /> {venue.location}</div>
+                      <div className="flex items-center gap-2 text-sm text-gray-200 mb-1">Capacity: {venue.capacity}</div>
+                      <div className="flex items-center gap-2 text-sm text-gray-200 mb-1">Type: {venue.type}</div>
+                      <div className="text-xs text-gray-300 mt-2"><span className="font-semibold">Restrictions:</span> {venue.restrictions}</div>
+                    </div>
+                    <div className="flex gap-2 mt-auto">
+                      {user?.role === 'super-admin' ? (
+                        <>
+                          <button 
+                            onClick={() => handleEditVenue(venue)}
+                            className="bg-yellow-900 bg-opacity-80 text-white px-3 py-2 rounded-lg font-medium hover:bg-yellow-800 transition-colors flex items-center justify-center"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteVenue(venue.id)}
+                            className="bg-red-900 bg-opacity-80 text-white px-3 py-2 rounded-lg font-medium hover:bg-red-800 transition-colors flex items-center justify-center"
+                          >
+                            <Trash size={16} />
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}          {/* Add/Edit Venue Modal */}
           {showAddModal && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-black/80 backdrop-blur-lg rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/20">

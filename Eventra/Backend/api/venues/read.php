@@ -30,7 +30,7 @@ try {
             "type" => $row['type'],
             "availability" => $row['availability'],
             "restrictions" => $row['restrictions'],
-            "images" => $row['images'],
+            "images" => json_decode($row['images'] ?? '[]', true),
             "created_at" => $row['created_at'],
             "updated_at" => $row['updated_at']
         );

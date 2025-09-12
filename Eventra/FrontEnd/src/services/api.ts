@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/';
+const API_BASE_URL = 'http://localhost/Eventra-ESRS/Eventra/Backend/api';
 
 export interface LoginResponse {
   success: boolean;
@@ -152,6 +152,35 @@ class ApiService {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(venueData),
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async updateVenue(venueData: {
+    id: number;
+    name: string;
+    capacity: number;
+    location: string;
+    type: string;
+    availability?: string;
+    restrictions?: string;
+    images?: string[];
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/venues/update.php`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(venueData),
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async deleteVenue(venueId: number): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/venues/delete.php`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ id: venueId }),
     });
 
     return this.handleResponse(response);

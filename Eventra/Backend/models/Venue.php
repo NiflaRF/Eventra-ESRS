@@ -30,7 +30,7 @@ class Venue {
                     capacity = :capacity,
                     location = :location,
                     type = :type,
-                    status = :status,
+                    availability = :availability,
                     restrictions = :restrictions,
                     images = :images";
 
@@ -39,15 +39,23 @@ class Venue {
         $this->name = htmlspecialchars($this->name ?? '');
         $this->location = htmlspecialchars($this->location ?? '');
         $this->type = htmlspecialchars($this->type ?? '');
-        $this->status = htmlspecialchars($this->status ?? '');
+        $this->availability = htmlspecialchars($this->availability ?? '');
         $this->restrictions = htmlspecialchars($this->restrictions ?? '');
-        $this->images = htmlspecialchars($this->images ?? '');
+        
+        // Handle images JSON encoding
+        if (is_array($this->images)) {
+            $this->images = json_encode($this->images);
+        } else if (is_string($this->images)) {
+            // Already a JSON string
+        } else {
+            $this->images = json_encode([]);
+        }
 
         $stmt->bindParam(":name", $this->name);
         $stmt->bindParam(":capacity", $this->capacity);
         $stmt->bindParam(":location", $this->location);
         $stmt->bindParam(":type", $this->type);
-        $stmt->bindParam(":status", $this->status);
+        $stmt->bindParam(":availability", $this->availability);
         $stmt->bindParam(":restrictions", $this->restrictions);
         $stmt->bindParam(":images", $this->images);
 
@@ -136,7 +144,19 @@ class Venue {
         $this->type = htmlspecialchars($this->type ?? '');
         $this->availability = htmlspecialchars($this->availability ?? '');
         $this->restrictions = htmlspecialchars($this->restrictions ?? '');
-        $this->images = htmlspecialchars($this->images ?? '');
+        
+        // Handle images JSON encoding
+        if (is_array($this->images)) {
+            $this->images = json_encode($this->images);
+        } else if (is_string($this->images)) {
+            // Already a JSON string, but ensure it's valid JSON
+            json_decode($this->images); 
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->images = json_encode([]);
+            }
+        } else {
+            $this->images = json_encode([]);
+        }
 
         $stmt->bindParam(":name", $this->name);
         $stmt->bindParam(":capacity", $this->capacity);
