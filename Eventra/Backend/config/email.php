@@ -240,6 +240,109 @@ class EmailService {
         $this->config = array_merge($this->config, $newConfig);
         $this->initializeMailer();
     }
+
+    /**
+     * Send notification email to admins about new contact message
+     */
+    public function sendContactNotification($adminEmail, $adminName, $contactName, $contactEmail, $message, $contactId) {
+        $subject = "New Contact Message - Eventra ESRS";
+        
+        $body = "
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; color: #333; }
+                .header { background-color: #6366f1; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; }
+                .message-box { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #6366f1; margin: 15px 0; }
+                .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+                .btn { background-color: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; }
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h2>New Contact Message Received</h2>
+            </div>
+            <div class='content'>
+                <p>Hello {$adminName},</p>
+                <p>A new contact message has been received through the Eventra ESRS website.</p>
+                
+                <h3>Contact Details:</h3>
+                <ul>
+                    <li><strong>Name:</strong> {$contactName}</li>
+                    <li><strong>Email:</strong> {$contactEmail}</li>
+                    <li><strong>Contact ID:</strong> #{$contactId}</li>
+                </ul>
+                
+                <h3>Message:</h3>
+                <div class='message-box'>
+                    " . nl2br(htmlspecialchars($message)) . "
+                </div>
+                
+                <p>Please log in to the admin dashboard to respond to this inquiry.</p>
+                
+                <a href='#' class='btn'>View in Admin Dashboard</a>
+            </div>
+            <div class='footer'>
+                <p>This is an automated message from Eventra ESRS. Please do not reply to this email.</p>
+                <p>Generated on " . date('Y-m-d H:i:s') . " UTC</p>
+            </div>
+        </body>
+        </html>";
+
+        return $this->sendEmailWithAttachments($adminEmail, $subject, $body, []);
+    }
+
+    /**
+     * Send reply email to contact message sender
+     */
+    public function sendContactReply($userEmail, $userName, $originalMessage, $replyMessage) {
+        $subject = "Re: Your Inquiry - Eventra ESRS";
+        
+        $body = "
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; color: #333; }
+                .header { background-color: #6366f1; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; }
+                .message-box { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #6366f1; margin: 15px 0; }
+                .original-message { background-color: #e5e7eb; padding: 15px; border-left: 4px solid #9ca3af; margin: 15px 0; }
+                .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h2>Response to Your Inquiry</h2>
+            </div>
+            <div class='content'>
+                <p>Dear {$userName},</p>
+                <p>Thank you for contacting us. We have received your message and are pleased to respond to your inquiry.</p>
+                
+                <h3>Our Response:</h3>
+                <div class='message-box'>
+                    " . nl2br(htmlspecialchars($replyMessage)) . "
+                </div>
+                
+                <h3>Your Original Message:</h3>
+                <div class='original-message'>
+                    " . nl2br(htmlspecialchars($originalMessage)) . "
+                </div>
+                
+                <p>If you have any further questions, please don't hesitate to contact us again.</p>
+                
+                <p>Best regards,<br>
+                The Eventra ESRS Team</p>
+            </div>
+            <div class='footer'>
+                <p>University Event Management System - Eventra ESRS</p>
+                <p>Generated on " . date('Y-m-d H:i:s') . " UTC</p>
+            </div>
+        </body>
+        </html>";
+
+        return $this->sendEmailWithAttachments($userEmail, $subject, $body, []);
+    }
 }
 
 $emailService = new EmailService();
@@ -267,6 +370,31 @@ if (defined('USE_MOCK_EMAIL') && USE_MOCK_EMAIL) {
                 'message' => 'Mock email logged successfully',
                 'recipient' => $toEmail,
                 'subject' => $subject,
+                'mock' => true
+            ];
+        }
+
+        public function sendContactNotification($adminEmail, $adminName, $contactName, $contactEmail, $message, $contactId) {
+            error_log("MOCK EMAIL - Contact Notification - Admin: {$adminEmail}, Contact: {$contactName} ({$contactEmail})");
+            
+            return [
+                'success' => true,
+                'message' => 'Mock contact notification email logged successfully',
+                'recipient' => $adminEmail,
+                'contact_name' => $contactName,
+                'contact_id' => $contactId,
+                'mock' => true
+            ];
+        }
+
+        public function sendContactReply($userEmail, $userName, $originalMessage, $replyMessage) {
+            error_log("MOCK EMAIL - Contact Reply - To: {$userEmail}, User: {$userName}");
+            
+            return [
+                'success' => true,
+                'message' => 'Mock contact reply email logged successfully',
+                'recipient' => $userEmail,
+                'user_name' => $userName,
                 'mock' => true
             ];
         }

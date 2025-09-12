@@ -1,16 +1,57 @@
 import React, { useState } from "react";
+import { apiService } from "../services/api";
+
+interface ContactForm {
+  name: string;
+  email: string;
+  message: string;
+}
 
 const ContactUs = () => {
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState<ContactForm>({ name: "", email: "", message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    // Clear notification when user starts typing
+    if (notification) setNotification(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // No backend logic, just reset form for now
-    setForm({ name: "", email: "", message: "" });
+    
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
+      setNotification({ type: 'error', message: 'Please fill in all fields.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const response = await apiService.submitContactForm(form);
+      
+      if (response.success) {
+        setNotification({ 
+          type: 'success', 
+          message: response.message || 'Your message has been sent successfully! We\'ll get back to you soon.'
+        });
+        setForm({ name: "", email: "", message: "" });
+      } else {
+        setNotification({ 
+          type: 'error', 
+          message: response.message || 'Failed to send message. Please try again.'
+        });
+      }
+    } catch (error) {
+      setNotification({ 
+        type: 'error', 
+        message: 'An error occurred while sending your message. Please try again later.'
+      });
+      console.error('Contact form error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -21,6 +62,18 @@ const ContactUs = () => {
           <p className="text-lg text-center text-gray-100 mb-8 w-full font-medium drop-shadow">
             Get in touch with us for your next event
           </p>
+
+          {/* Notification */}
+          {notification && (
+            <div className={`mb-6 p-4 rounded-lg text-white text-center font-medium ${
+              notification.type === 'success' 
+                ? 'bg-green-600 bg-opacity-80' 
+                : 'bg-red-600 bg-opacity-80'
+            }`}>
+              {notification.message}
+            </div>
+          )}
+
           <form
             onSubmit={handleSubmit}
             className="bg-gray-800 bg-opacity-70 shadow-lg rounded-xl p-8 w-full flex flex-col gap-6"
@@ -74,9 +127,14 @@ const ContactUs = () => {
             </div>
             <button
               type="submit"
-              className="w-full bg-gray-900 text-white font-bold rounded-lg py-3 mt-2 shadow-md border border-white hover:bg-gray-700 transition-colors"
+              disabled={isSubmitting}
+              className={`w-full text-white font-bold rounded-lg py-3 mt-2 shadow-md border border-white transition-colors ${
+                isSubmitting 
+                  ? 'bg-gray-600 cursor-not-allowed' 
+                  : 'bg-gray-900 hover:bg-gray-700'
+              }`}
             >
-              Send Message
+              {isSubmitting ? 'Sending...' : 'Send Message'}
             </button>
           </form>
         </div>

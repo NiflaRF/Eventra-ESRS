@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import NotificationPopup from '../../components/NotificationPopup';
+import ContactInquiries from '../../components/ContactInquiries';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/api';
 import { 
@@ -16,7 +17,8 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
-  Bell
+  Bell,
+  Mail
 } from 'lucide-react';
 
 interface Booking {
@@ -71,6 +73,7 @@ const AdminDashboard: React.FC = () => {
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentNotifications, setRecentNotifications] = useState<Notification[]>([]);
   const [isNotificationPopupOpen, setIsNotificationPopupOpen] = useState(false);
+  const [isContactInquiriesOpen, setIsContactInquiriesOpen] = useState(false);
 
   // Fetch admin dashboard data
   useEffect(() => {
@@ -195,6 +198,12 @@ const AdminDashboard: React.FC = () => {
       icon: FileText,
       link: '/admin/tools?tab=approvals',
       color: 'bg-purple-500'
+    },
+    {
+      title: 'Contact Inquiries',
+      icon: Mail,
+      action: () => setIsContactInquiriesOpen(true),
+      color: 'bg-orange-500'
     },
     {
       title: 'Reports & Analytics',
@@ -370,24 +379,47 @@ const AdminDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-white mb-6">Admin Actions</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {adminActions.map((action, index) => (
-                  <Link
-                    key={index}
-                    to={action.link}
-                    className="bg-black/30 backdrop-blur-sm rounded-2xl shadow-xl border border-white/10 p-6 hover:scale-105 transition-all duration-200 group hover:bg-black/40"
-                  >
-                    <div className="flex items-start space-x-4">
-                      <div className={`${action.color} bg-opacity-80 p-3 rounded-xl text-white group-hover:scale-110 transition-transform duration-200 shadow-lg`}>
-                        <action.icon size={24} />
+                {adminActions.map((action, index) => {
+                  if (action.link) {
+                    return (
+                      <Link
+                        key={index}
+                        to={action.link}
+                        className="bg-black/30 backdrop-blur-sm rounded-2xl shadow-xl border border-white/10 p-6 hover:scale-105 transition-all duration-200 group hover:bg-black/40"
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className={`${action.color} bg-opacity-80 p-3 rounded-xl text-white group-hover:scale-110 transition-transform duration-200 shadow-lg`}>
+                            <action.icon size={24} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-white group-hover:text-blue-200 transition-colors">
+                              {action.title}
+                            </h3>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  } else {
+                    return (
+                      <div
+                        key={index}
+                        onClick={action.action}
+                        className="bg-black/30 backdrop-blur-sm rounded-2xl shadow-xl border border-white/10 p-6 hover:scale-105 transition-all duration-200 group hover:bg-black/40 cursor-pointer"
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className={`${action.color} bg-opacity-80 p-3 rounded-xl text-white group-hover:scale-110 transition-transform duration-200 shadow-lg`}>
+                            <action.icon size={24} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-white group-hover:text-blue-200 transition-colors">
+                              {action.title}
+                            </h3>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-white group-hover:text-blue-200 transition-colors">
-                          {action.title}
-                        </h3>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    );
+                  }
+                })}
               </div>
             </div>
 
@@ -456,6 +488,11 @@ const AdminDashboard: React.FC = () => {
         isOpen={isNotificationPopupOpen} 
         onClose={() => setIsNotificationPopupOpen(false)} 
       />
+      {isContactInquiriesOpen && (
+        <ContactInquiries 
+          onClose={() => setIsContactInquiriesOpen(false)} 
+        />
+      )}
     </Layout>
   );
 };

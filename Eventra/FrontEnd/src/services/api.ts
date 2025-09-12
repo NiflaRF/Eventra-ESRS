@@ -1240,6 +1240,89 @@ class ApiService {
     return this.handleResponse<{ success: boolean; message: string }>(response);
   }
 
+  // Contact API methods
+  async submitContactForm(contactData: {
+    name: string;
+    email: string;
+    message: string;
+  }): Promise<{ success: boolean; message: string; contact_id?: number }> {
+    const response = await fetch(`${API_BASE_URL}/contact/submit.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(contactData),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string; contact_id?: number }>(response);
+  }
+
+  async getContactMessages(filters?: {
+    status?: string;
+    priority?: string;
+    limit?: number;
+  }): Promise<{ 
+    success: boolean; 
+    message?: string; 
+    data?: any[]; 
+    count?: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.priority) params.append('priority', filters.priority);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/contact/read.php${queryString ? '?' + queryString : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse<{ 
+      success: boolean; 
+      message?: string; 
+      data?: any[]; 
+      count?: number;
+    }>(response);
+  }
+
+  async replyToContact(contactId: number, replyMessage: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/contact/reply.php`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        contact_id: contactId,
+        reply_message: replyMessage,
+      }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
+  async updateContactStatus(contactId: number, status: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/contact/update-status.php`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        contact_id: contactId,
+        status: status,
+      }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
+  async deleteContactMessage(contactId: number): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/contact/delete.php?id=${contactId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
   // Get current user from localStorage
   getCurrentUser(): any {
     const userStr = localStorage.getItem('eventra_user');
