@@ -53,6 +53,7 @@ const ServiceProviderDashboard: React.FC = () => {
   const [commentError, setCommentError] = useState('');
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({ pending: 0, forwarded: 0, approved: 0, rejected: 0 });
 
   // Fetch event planning requests
   const fetchData = async () => {
@@ -74,13 +75,30 @@ const ServiceProviderDashboard: React.FC = () => {
         pendingRequests = [...pendingRequests, ...(forwardedResponse.data || [])];
       }
       
+      // Fetch signed letters by service provider to filter out already processed requests
+      const signedLettersResponse = await apiService.getSignedLetters({
+        from_role: 'service-provider'
+      });
+      
+      let processedEventPlanIds: number[] = [];
+      if (signedLettersResponse.success && signedLettersResponse.data) {
+        processedEventPlanIds = signedLettersResponse.data
+          .filter((letter: any) => letter.event_plan_id)
+          .map((letter: any) => parseInt(letter.event_plan_id));
+      }
+      
+      // Filter out event plans that service provider has already processed
+      const unprocessedRequests = pendingRequests.filter((request: any) => 
+        !processedEventPlanIds.includes(request.id)
+      );
+      
       // Also fetch approved and rejected requests for accurate counts
       const [approvedResponse, rejectedResponse] = await Promise.all([
         apiService.getEventPlans({ status: 'approved' }),
         apiService.getEventPlans({ status: 'rejected' })
       ]);
       
-      let allRequests = [...pendingRequests];
+      let allRequests = [...unprocessedRequests];
       
       if (approvedResponse.success) {
         allRequests = [...allRequests, ...(approvedResponse.data || [])];
@@ -90,17 +108,27 @@ const ServiceProviderDashboard: React.FC = () => {
         allRequests = [...allRequests, ...(rejectedResponse.data || [])];
       }
       
-      console.log('Service Provider: Pending requests:', pendingRequests);
+      console.log('Service Provider: Unprocessed requests:', unprocessedRequests);
       console.log('Service Provider: All requests for counts:', allRequests);
+      console.log('Service Provider: Processed event plan IDs:', processedEventPlanIds);
       console.log('Service Provider: Status breakdown:', {
-        submitted: pendingRequests.filter(r => r.status === 'submitted').length,
-        forwarded: pendingRequests.filter(r => r.status === 'forwarded_to_service_provider').length,
+        submitted: unprocessedRequests.filter(r => r.status === 'submitted').length,
+        forwarded: unprocessedRequests.filter(r => r.status === 'forwarded_to_service_provider').length,
         approved: allRequests.filter(r => r.status === 'approved').length,
         rejected: allRequests.filter(r => r.status === 'rejected').length,
         total: allRequests.length
       });
       
-      setRequests(allRequests);
+      // Set stats for counters
+      setStats({
+        pending: unprocessedRequests.length,
+        forwarded: unprocessedRequests.filter(r => r.status === 'forwarded_to_service_provider').length,
+        approved: allRequests.filter(r => r.status === 'approved').length,
+        rejected: allRequests.filter(r => r.status === 'rejected').length
+      });
+      
+      // Set only unprocessed requests for display (already filtered)
+      setRequests(unprocessedRequests);
     } catch (error) {
       console.error('Error fetching event planning requests:', error);
       toast.error('Error fetching event planning requests');
@@ -158,10 +186,10 @@ const ServiceProviderDashboard: React.FC = () => {
     return () => clearInterval(notificationInterval);
   }, [requests]);
 
-  // Stats
-  const pendingCount = requests.filter(r => r.status === 'submitted' || r.status === 'forwarded_to_service_provider').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
+  // Stats from state (already calculated in fetchData)
+  const pendingCount = stats.pending;
+  const approvedCount = stats.approved;
+  const rejectedCount = stats.rejected;
 
   const handleAction = (id: number, action: 'approve' | 'reject') => {
     const request = requests.find(r => r.id === id);
@@ -323,7 +351,7 @@ const ServiceProviderDashboard: React.FC = () => {
               </div>
                 <div className="ml-4">
                   <p className="text-white/70 text-sm">Forwarded</p>
-                  <p className="text-2xl font-bold text-white">{requests.filter(r => r.status === 'forwarded_to_service_provider').length}</p>
+                  <p className="text-2xl font-bold text-white">{stats.forwarded}</p>
                   </div>
                 </div>
               </div>
@@ -364,7 +392,7 @@ const ServiceProviderDashboard: React.FC = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400 mx-auto"></div>
                 <p className="text-white mt-4">Loading event planning requests...</p>
               </div>
-            ) : requests.filter(request => request.status === 'submitted' || request.status === 'forwarded_to_service_provider').length === 0 ? (
+            ) : requests.length === 0 ? (
               <div className="text-center py-8">
                 <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-white text-lg">No pending event planning requests</p>
@@ -373,7 +401,6 @@ const ServiceProviderDashboard: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {requests
-                  .filter(request => request.status === 'submitted' || request.status === 'forwarded_to_service_provider')
                   .map((request) => (
                   <div key={request.id} className="bg-white/5 backdrop-blur-sm rounded-lg p-6 border border-white/10">
                     <div className="flex items-start justify-between">

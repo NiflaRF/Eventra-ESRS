@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'role_display_name' => getRoleDisplayName($row['from_role']),
                 'letter_type' => $row['letter_type'],
                 'letter_content' => $row['letter_content'],
-                'signature_data' => $row['signature_data'],
+                'signature_data' => $row['signature_data'] ? json_decode($row['signature_data'], true) : null,
                 'status' => $row['status'],
                 'created_at' => $row['created_at'],
                 'sent_at' => $row['sent_at'],

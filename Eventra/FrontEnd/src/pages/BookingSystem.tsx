@@ -60,7 +60,7 @@ const BookingSystem: React.FC = () => {
 
   const availableFacilities = [
     'Projector', 'Microphone', 'Speaker System', 'Wi-Fi', 'Air Conditioning',
-    'Whiteboard', 'Flip Chart', 'Stage Setup', 'Lighting System', 'Recording Equipment'
+    'Whiteboard', 'Flip Chart', 'Stage Setup', 'Lighting System', 'Full-Event Coverage and Photography Packages'
   ];
 
   const timeSlots = [

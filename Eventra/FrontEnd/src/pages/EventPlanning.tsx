@@ -146,7 +146,7 @@ const EventPlanning: React.FC = () => {
   }, [user?.id]);
   const availableFacilities = [
     'Projector', 'Microphone', 'Speaker System', 'Stage Setup', 
-    'Lighting System', 'Recording Equipment', 'Wi-Fi', 'Air Conditioning',
+    'Lighting System', 'Full-Event Coverage and Photography Packages', 'Wi-Fi', 'Air Conditioning',
     'Whiteboard'
   ];
 
@@ -520,14 +520,6 @@ const EventPlanning: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4 mt-6">
-              <h4 className="font-medium text-blue-200 mb-2">Important Note</h4>
-              <p className="text-blue-100 text-sm">
-                All four approval letters are required for event planning submission. 
-                These letters will be reviewed by the admin and forwarded to the respective authorities.
-              </p>
             </div>
 
             <div>

@@ -50,12 +50,11 @@ if (!empty($data->event_plan_id) && !empty($data->action)) {
     }
     
     if ($data->action === 'approve') {
-        $eventPlan->status = 'approved';
-        $eventPlan->remarks = $data->comment ?? '';
-        $updateResult = $eventPlan->update();
-        error_log("Service Provider Approval: Event plan {$data->event_plan_id} status updated to 'approved'. Update result: " . ($updateResult ? 'success' : 'failed'));
+        // Service provider approval - don't change event plan status, only create approval letter
         $letter_content = $data->comment ?? "Event plan '{$eventPlan->title}' has been approved by Service Provider. All service requirements can be fulfilled.";
+        error_log("Service Provider Approval: Event plan {$data->event_plan_id} approved by service provider. Status remains '{$eventPlan->status}' pending super-admin final decision.");
     } else {
+        // Service provider rejection - only change status to rejected for rejection case
         $eventPlan->status = 'rejected';
         $eventPlan->remarks = $data->comment ?? '';
         $updateResult = $eventPlan->update();

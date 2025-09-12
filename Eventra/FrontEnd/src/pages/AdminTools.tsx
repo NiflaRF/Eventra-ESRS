@@ -139,6 +139,9 @@ const AdminTools: React.FC = () => {
   } | null>(null);
   const [authorityLetters, setAuthorityLetters] = useState<any[]>([]);
   const [isLoadingAuthorityLetters, setIsLoadingAuthorityLetters] = useState(false);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
 
 
 
@@ -168,6 +171,92 @@ const AdminTools: React.FC = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Cleanup PDF URLs on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (currentPdfUrl) {
+        URL.revokeObjectURL(currentPdfUrl);
+      }
+    };
+  }, [currentPdfUrl]);
+
+  // Handle PDF viewing like other dashboards
+  const handleViewPdf = (pdfData: any) => {
+    console.log('🔍 handleViewPdf called with:', pdfData);
+    
+    if (!pdfData) {
+      toast.error('No PDF data available');
+      return;
+    }
+    
+    try {
+      let source: string | null = null;
+      
+      // Handle different signature_data formats
+      if (typeof pdfData === 'string') {
+        // Check if it's a JSON string that needs parsing
+        if (pdfData.startsWith('{') || pdfData.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(pdfData);
+            source = parsed.dataUrl || parsed.url || parsed.content || parsed;
+          } catch (e) {
+            source = pdfData;
+          }
+        } else {
+          source = pdfData;
+        }
+      } else if (pdfData && typeof pdfData === 'object') {
+        source = pdfData.dataUrl || pdfData.url || pdfData.content || null;
+      }
+      
+      if (!source) {
+        toast.error('Invalid PDF format');
+        return;
+      }
+      
+      // Clean up the source
+      source = source.trim();
+      if ((source.startsWith('"') && source.endsWith('"')) || (source.startsWith("'") && source.endsWith("'"))) {
+        source = source.substring(1, source.length - 1);
+      }
+      if (source.startsWith('data%3A') || source.includes('%2F')) {
+        source = decodeURIComponent(source);
+      }
+      
+      console.log('🔍 Processed source:', source.substring(0, 100) + '...');
+      
+      // Handle base64 data URLs
+      if (source.startsWith('data:application/pdf;base64,') || source.startsWith('data:application/octet-stream;base64,')) {
+        const base64 = source.split(',')[1];
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        // Clean up previous URL
+        if (selectedPdfUrl) {
+          URL.revokeObjectURL(selectedPdfUrl);
+        }
+        
+        setSelectedPdfUrl(url);
+        setShowPdfModal(true);
+        return;
+      }
+      
+      // For other formats, try to use directly
+      setSelectedPdfUrl(source);
+      setShowPdfModal(true);
+      
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+      toast.error('Failed to load PDF document');
+    }
+  };
 
   // Fetch system logs when filters change
   useEffect(() => {
@@ -223,33 +312,22 @@ const AdminTools: React.FC = () => {
         status: 'pending'
       });
       
-      // Fetch all relevant event plans to get accurate status information
-      const [pendingEventPlansResponse, forwardedEventPlansResponse, approvedEventPlansResponse, rejectedEventPlansResponse] = await Promise.all([
-        apiService.getEventPlans({ status: 'submitted' }),
-        apiService.getEventPlans({ status: 'forwarded_to_service_provider' }),
-        apiService.getEventPlans({ status: 'approved' }),
-        apiService.getEventPlans({ status: 'rejected' })
-      ]);
-      
-      let allEventPlans: any[] = [];
-      
-      if (pendingEventPlansResponse.success) {
-        allEventPlans = [...(pendingEventPlansResponse.data || [])];
-      }
-      
-      if (forwardedEventPlansResponse.success) {
-        allEventPlans = [...allEventPlans, ...(forwardedEventPlansResponse.data || [])];
-      }
-      
-      if (approvedEventPlansResponse.success) {
-        allEventPlans = [...allEventPlans, ...(approvedEventPlansResponse.data || [])];
-      }
-      
-      if (rejectedEventPlansResponse.success) {
-        allEventPlans = [...allEventPlans, ...(rejectedEventPlansResponse.data || [])];
-      }
-      
-      const allPendingApprovals: PendingApproval[] = [];
+    // Fetch all relevant event plans to get accurate status information
+    // Only fetch pending event plans for approval queue (exclude approved/rejected)
+    const [pendingEventPlansResponse, forwardedEventPlansResponse] = await Promise.all([
+      apiService.getEventPlans({ status: 'submitted' }),
+      apiService.getEventPlans({ status: 'forwarded_to_service_provider' })
+    ]);
+    
+    let allEventPlans: any[] = [];
+    
+    if (pendingEventPlansResponse.success) {
+      allEventPlans = [...(pendingEventPlansResponse.data || [])];
+    }
+    
+    if (forwardedEventPlansResponse.success) {
+      allEventPlans = [...allEventPlans, ...(forwardedEventPlansResponse.data || [])];
+    }      const allPendingApprovals: PendingApproval[] = [];
       
       // Process bookings
       if (pendingBookingsResponse.success) {
@@ -542,7 +620,19 @@ const AdminTools: React.FC = () => {
       try {
         setIsLoadingAuthorityLetters(true);
         const response = await apiService.getAuthorityLetters(parseInt(approval.id));
+        console.log('🔍 Authority letters API response:', response);
+        
         if (response.success) {
+          console.log('🔍 Authority letters data:', response.data);
+          response.data?.forEach((letter: any, index: number) => {
+            console.log(`🔍 Letter ${index}:`, {
+              role: letter.role,
+              signature_data_type: typeof letter.signature_data,
+              signature_data_preview: letter.signature_data ? (typeof letter.signature_data === 'string' ? letter.signature_data.substring(0, 100) : JSON.stringify(letter.signature_data).substring(0, 100)) : 'null',
+              letter_content_type: typeof letter.letter_content,
+              letter_content_length: letter.letter_content ? letter.letter_content.length : 0
+            });
+          });
           setAuthorityLetters(response.data || []);
         } else {
           console.error('Failed to fetch authority letters:', response.message);
@@ -688,32 +778,25 @@ const AdminTools: React.FC = () => {
       console.log('🔍 Viewing authority letter for role:', role);
       console.log('📄 Authority letter data:', authorityLetter);
       
-      if (authorityLetter && (authorityLetter.signature_data || authorityLetter.letter_content)) {
-        console.log('✅ Found letter content:', {
-          signature_data: authorityLetter.signature_data ? 'Available' : 'Not available',
-          letter_content: authorityLetter.letter_content ? 'Available' : 'Not available'
-        });
+      if (authorityLetter) {
+        // Try signature_data first, then letter_content
+        const pdfData = authorityLetter.signature_data || authorityLetter.letter_content;
         
-        // Set the file preview data and show modal
-        setSelectedFilePreview({
-          roleName: authorityLetter.role_display_name,
-          fileName: `${authorityLetter.role_display_name} Approval Letter`,
-          eventTitle: selectedViewApproval.title,
-          requester: selectedViewApproval.requester,
-          recipient: selectedViewApproval.requestedBy,
-          authorityLetter: authorityLetter
-        });
-        setShowFilePreviewModal(true);
-        
+        if (pdfData) {
+          console.log('✅ Found PDF data, calling handleViewPdf');
+          handleViewPdf(pdfData);
+        } else {
+          const roleDisplayNames = {
+            'vice-chancellor': 'Vice Chancellor',
+            'warden': 'Warden', 
+            'administration': 'Administration',
+            'student-union': 'Student Union'
+          };
+          console.log('❌ No PDF data available for role:', role);
+          toast.error(`No ${roleDisplayNames[role as keyof typeof roleDisplayNames] || role} letter content available`);
+        }
       } else {
-        const roleDisplayNames = {
-          'vice-chancellor': 'Vice Chancellor',
-          'warden': 'Warden', 
-          'administration': 'Administration',
-          'student-union': 'Student Union'
-        };
-        console.log('❌ No letter content available for role:', role);
-        toast.error(`No ${roleDisplayNames[role as keyof typeof roleDisplayNames] || role} letter content available`);
+        toast.error('Authority letter not found');
       }
     } else {
       toast.error('No event plan selected');
@@ -1283,10 +1366,10 @@ const AdminTools: React.FC = () => {
                                  (approvalQueueTab === 'event-planning' && approval.type === 'event-plan');
             
             // For bookings, check for 'pending' status
-            // For event plans, show all statuses (submitted, pending service provider, etc.)
+            // For event plans, only show submitted status (exclude approved/rejected)
             const isCorrectStatus = approval.type === 'booking' ? 
               approval.status === 'pending' : 
-              true; // Show all event plans regardless of status
+              approval.status === 'submitted';
             
             return isCorrectType && isCorrectStatus;
           })
@@ -1433,10 +1516,10 @@ const AdminTools: React.FC = () => {
                                  (approvalQueueTab === 'event-planning' && approval.type === 'event-plan');
             
             // For bookings, check for 'pending' status
-            // For event plans, show all statuses (submitted, pending service provider, etc.)
+            // For event plans, only show submitted status (exclude approved/rejected)
             const isCorrectStatus = approval.type === 'booking' ? 
               approval.status === 'pending' : 
-              true; // Show all event plans regardless of status
+              approval.status === 'submitted';
             
             return isCorrectType && isCorrectStatus;
           }).length === 0 && (
@@ -2649,6 +2732,11 @@ const AdminTools: React.FC = () => {
                   <button
                     className="absolute top-2 right-2 text-white hover:text-gray-300 text-2xl font-bold"
                     onClick={() => {
+                      // Cleanup the PDF URL to prevent memory leaks
+                      if (currentPdfUrl) {
+                        URL.revokeObjectURL(currentPdfUrl);
+                        setCurrentPdfUrl(null);
+                      }
                       setShowFilePreviewModal(false);
                       setSelectedFilePreview(null);
                     }}
@@ -2661,87 +2749,226 @@ const AdminTools: React.FC = () => {
                       console.log('📄 Signature Data:', selectedFilePreview.authorityLetter?.signature_data);
                       console.log('📄 Letter Content:', selectedFilePreview.authorityLetter?.letter_content);
                       
-                                             if (selectedFilePreview.authorityLetter?.signature_data) {
-                         console.log('✅ Using signature_data for PDF');
-                         const pdfData = selectedFilePreview.authorityLetter.signature_data;
-                         console.log('📄 PDF Data:', pdfData);
-                         
-                         // Handle signature_data as JSON object (like other dashboards)
-                         let source: string | null = null;
-                         if (typeof pdfData === 'string') {
-                           source = pdfData;
-                         } else if (pdfData && typeof pdfData === 'object') {
-                           source = pdfData.dataUrl || pdfData.url || pdfData.content || null;
-                         }
-                         
-                         if (source) {
-                           // Sanitize the source
-                           source = source.trim();
-                           if ((source.startsWith('"') && source.endsWith('"')) || (source.startsWith("'") && source.endsWith("'"))) {
-                             source = source.substring(1, source.length - 1);
-                           }
-                           if (source.startsWith('data%3A') || source.includes('%2F')) {
-                             source = decodeURIComponent(source);
-                           }
-                           
-                           return (
-                             <iframe
-                               src={source}
-                               className="w-full h-full"
-                               title="PDF Viewer"
-                               onLoad={() => console.log('✅ PDF loaded successfully from signature_data')}
-                               onError={(e) => {
-                                 console.error('❌ PDF load error from signature_data:', e);
-                                 toast.error('Failed to load PDF from signature data');
-                               }}
-                             />
-                           );
-                         } else {
-                           console.log('❌ No valid source found in signature_data');
-                           return (
-                             <div className="text-center text-white">
-                               <p className="text-lg mb-2">Invalid PDF format in signature data</p>
-                               <p className="text-sm text-gray-400">The signature data does not contain valid PDF content</p>
-                             </div>
-                           );
-                         }
-                       } else if (selectedFilePreview.authorityLetter?.letter_content) {
-                         console.log('✅ Using letter_content for PDF');
-                         const pdfData = selectedFilePreview.authorityLetter.letter_content;
-                         console.log('📄 PDF Data length:', pdfData ? pdfData.length : 0);
-                         console.log('📄 PDF Data preview:', pdfData ? pdfData.substring(0, 100) + '...' : 'None');
-                         
-                         return (
-                           <iframe
-                             src={`data:application/pdf;base64,${pdfData}`}
-                             className="w-full h-full"
-                             title="PDF Viewer"
-                             onLoad={() => console.log('✅ PDF loaded successfully from letter_content')}
-                             onError={(e) => {
-                               console.error('❌ PDF load error from letter_content:', e);
-                               toast.error('Failed to load PDF from letter content');
-                             }}
-                           />
-                         );
-                       } else {
-                        console.log('❌ No PDF content available');
-                        return (
-                          <div className="text-center text-white">
-                            <p className="text-lg mb-2">No PDF content available</p>
-                            <p className="text-sm text-gray-400">The authority letter does not contain PDF data</p>
-                            <div className="mt-4 text-xs text-gray-500">
-                              <p>Debug Info:</p>
-                              <p>Signature Data: {selectedFilePreview.authorityLetter?.signature_data ? 'Present' : 'Missing'}</p>
-                              <p>Letter Content: {selectedFilePreview.authorityLetter?.letter_content ? 'Present' : 'Missing'}</p>
+                      const handlePdfData = (pdfData: any): string | null => {
+                        console.log('📥 handlePdfData called with:', pdfData);
+                        console.log('📥 Type:', typeof pdfData);
+                        
+                        if (!pdfData) {
+                          console.log('❌ No pdfData provided');
+                          return null;
+                        }
+                        
+                        try {
+                          let source: string | null = null;
+                          
+                          // Handle different signature_data formats
+                          if (typeof pdfData === 'string') {
+                            console.log('📄 Processing as string');
+                            // Check if it's a JSON string that needs parsing
+                            if (pdfData.startsWith('{') || pdfData.startsWith('[')) {
+                              try {
+                                const parsed = JSON.parse(pdfData);
+                                console.log('📄 Parsed JSON from string:', parsed);
+                                source = parsed.dataUrl || parsed.url || parsed.content || parsed;
+                              } catch (e) {
+                                console.log('📄 Not valid JSON, using as-is');
+                                source = pdfData;
+                              }
+                            } else {
+                              source = pdfData;
+                            }
+                          } else if (pdfData && typeof pdfData === 'object') {
+                            console.log('📄 Processing as object, keys:', Object.keys(pdfData));
+                            source = pdfData.dataUrl || pdfData.url || pdfData.content || null;
+                            console.log('📄 Extracted source:', source ? source.substring(0, 100) + '...' : 'null');
+                          }
+                          
+                          if (!source) {
+                            console.log('❌ No valid source found');
+                            return null;
+                          }
+                          
+                          console.log('🔧 Raw source length:', source.length);
+                          console.log('🔧 Source starts with:', source.substring(0, 50));
+                          
+                          // Sanitize the source
+                          source = source.trim();
+                          if ((source.startsWith('"') && source.endsWith('"')) || (source.startsWith("'") && source.endsWith("'"))) {
+                            console.log('🔧 Removing quotes from source');
+                            source = source.substring(1, source.length - 1);
+                          }
+                          if (source.startsWith('data%3A') || source.includes('%2F')) {
+                            console.log('🔧 Decoding URI component');
+                            source = decodeURIComponent(source);
+                          }
+                          
+                          console.log('🔧 Processed source starts with:', source.substring(0, 50));
+                          console.log('🔧 Is valid data URL?', source.startsWith('data:application/pdf;base64,') || source.startsWith('data:application/octet-stream;base64,'));
+                          
+                          // Convert base64 data to blob URL like other dashboards do
+                          if (source.startsWith('data:application/pdf;base64,') || source.startsWith('data:application/octet-stream;base64,')) {
+                            console.log('✅ Converting base64 to blob URL');
+                            const base64 = source.split(',')[1];
+                            console.log('🔧 Base64 length:', base64.length);
+                            
+                            const byteCharacters = atob(base64);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                              byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            
+                            console.log('✅ Generated blob URL:', url);
+                            
+                            // Clean up previous URL to prevent memory leaks
+                            if (currentPdfUrl) {
+                              URL.revokeObjectURL(currentPdfUrl);
+                            }
+                            setCurrentPdfUrl(url);
+                            
+                            return url;
+                          }
+                          
+                          console.log('⚠️ Source is not a valid data URL, returning as-is');
+                          return source;
+                        } catch (error) {
+                          console.error('💥 Error processing PDF data:', error);
+                          return null;
+                        }
+                      };
+
+                      if (selectedFilePreview.authorityLetter?.signature_data) {
+                        console.log('✅ Using signature_data for PDF');
+                        console.log('🔍 Raw signature_data:', selectedFilePreview.authorityLetter.signature_data);
+                        console.log('🔍 Type of signature_data:', typeof selectedFilePreview.authorityLetter.signature_data);
+                        
+                        const pdfUrl = handlePdfData(selectedFilePreview.authorityLetter.signature_data);
+                        
+                        console.log('🔍 Generated PDF URL:', pdfUrl);
+                        
+                        if (pdfUrl) {
+                          return (
+                            <iframe
+                              src={pdfUrl}
+                              className="w-full h-full"
+                              title="PDF Viewer"
+                              onLoad={() => console.log('✅ PDF loaded successfully from signature_data')}
+                              onError={(e) => {
+                                console.error('❌ PDF load error from signature_data:', e);
+                                toast.error('Failed to load PDF from signature data');
+                              }}
+                            />
+                          );
+                        } else {
+                          console.log('❌ No valid source found in signature_data');
+                          return (
+                            <div className="text-center text-white">
+                              <p className="text-lg mb-2">Invalid PDF format in signature data</p>
+                              <p className="text-sm text-gray-400">The signature data does not contain valid PDF content</p>
                             </div>
-                          </div>
-                        );
+                          );
+                        }
+                      } else if (selectedFilePreview.authorityLetter?.letter_content) {
+                        console.log('✅ Using letter_content for PDF');
+                        const pdfData = selectedFilePreview.authorityLetter.letter_content;
+                        console.log('📄 PDF Data length:', pdfData ? pdfData.length : 0);
+                        
+                        if (pdfData) {
+                          try {
+                            // Convert base64 to blob URL like other dashboards do
+                            const byteCharacters = atob(pdfData);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                              byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            
+                            // Clean up previous URL to prevent memory leaks
+                            if (currentPdfUrl) {
+                              URL.revokeObjectURL(currentPdfUrl);
+                            }
+                            setCurrentPdfUrl(url);
+                            
+                            return (
+                              <iframe
+                                src={url}
+                                className="w-full h-full"
+                                title="PDF Viewer"
+                                onLoad={() => console.log('✅ PDF loaded successfully from letter_content')}
+                                onError={(e) => {
+                                  console.error('❌ PDF load error from letter_content:', e);
+                                  toast.error('Failed to load PDF from letter content');
+                                }}
+                              />
+                            );
+                          } catch (error) {
+                            console.error('Error creating blob URL:', error);
+                            return (
+                              <div className="text-center text-white">
+                                <p className="text-lg mb-2">Error loading PDF</p>
+                                <p className="text-sm text-gray-400">Failed to process PDF data</p>
+                              </div>
+                            );
+                          }
+                        }
                       }
+                      
+                      console.log('❌ No PDF content available');
+                      return (
+                        <div className="text-center text-white">
+                          <p className="text-lg mb-2">No PDF content available</p>
+                          <p className="text-sm text-gray-400">The authority letter does not contain PDF data</p>
+                          <div className="mt-4 text-xs text-gray-500">
+                            <p>Debug Info:</p>
+                            <p>Signature Data: {selectedFilePreview.authorityLetter?.signature_data ? 'Present' : 'Missing'}</p>
+                            <p>Letter Content: {selectedFilePreview.authorityLetter?.letter_content ? 'Present' : 'Missing'}</p>
+                          </div>
+                        </div>
+                      );
                     })()}
                   </div>
                 </div>
               </div>
             )}
+
+      {/* PDF Modal */}
+      {showPdfModal && selectedPdfUrl && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+          <div className="bg-white rounded-lg w-11/12 h-5/6 flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-800">PDF Document</h3>
+              <button
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                onClick={() => {
+                  setShowPdfModal(false);
+                  if (selectedPdfUrl && selectedPdfUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(selectedPdfUrl);
+                  }
+                  setSelectedPdfUrl(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 p-4">
+              <iframe
+                src={selectedPdfUrl}
+                className="w-full h-full border"
+                title="PDF Viewer"
+                onLoad={() => console.log('✅ PDF loaded successfully in modal')}
+                onError={(e) => {
+                  console.error('❌ PDF load error in modal:', e);
+                  toast.error('Failed to load PDF document');
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <NotificationPopup 
         isOpen={isNotificationPopupOpen} 
