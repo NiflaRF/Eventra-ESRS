@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, Check, Info } from 'lucide-react';
+import OTPVerification from '../../components/auth/OTPVerification';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +19,15 @@ const Register: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [registrationEmail, setRegistrationEmail] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({
+    hasMinLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecialChar: false
+  });
   
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -37,8 +47,11 @@ const Register: React.FC = () => {
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    } else {
+      const passwordErrors = validatePassword(formData.password);
+      if (passwordErrors.length > 0) {
+        newErrors.password = passwordErrors.join('. ');
+      }
     }
     
     if (formData.password !== formData.confirmPassword) {
@@ -51,6 +64,38 @@ const Register: React.FC = () => {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = [];
+    
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least one uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+      errors.push('Password must contain at least one number');
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      errors.push('Password must contain at least one special character');
+    }
+    
+    return errors;
+  };
+
+  const updatePasswordStrength = (password: string) => {
+    setPasswordStrength({
+      hasMinLength: password.length >= 8,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,10 +114,9 @@ const Register: React.FC = () => {
       });
       
       if (success) {
-        setShowSuccess(true);
-        setTimeout(() => {
-          navigate('/login');
-        }, 1500);
+        // For OTP flow, success means OTP was sent
+        setRegistrationEmail(formData.email);
+        setShowOTPVerification(true);
       } else {
         setErrors({ general: 'Registration failed. Please try again.' });
       }
@@ -86,6 +130,27 @@ const Register: React.FC = () => {
     }
   };
 
+  const handleOTPVerificationSuccess = (userData: any, token: string) => {
+    setShowSuccess(true);
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 1500);
+  };
+
+  const handleBackToRegistration = () => {
+    setShowOTPVerification(false);
+    setRegistrationEmail('');
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      role: 'student',
+      acceptTerms: false
+    });
+    setErrors({});
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
@@ -95,11 +160,27 @@ const Register: React.FC = () => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
+    // Update password strength in real-time
+    if (name === 'password') {
+      updatePasswordStrength(value);
+    }
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
+
+  // Show OTP verification if needed
+  if (showOTPVerification) {
+    return (
+      <OTPVerification
+        email={registrationEmail}
+        onVerificationSuccess={handleOTPVerificationSuccess}
+        onBackToRegistration={handleBackToRegistration}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 relative" style={{ width: '100vw', margin: 0, padding: 0, backgroundColor: '#bd7880' }}>
@@ -117,8 +198,8 @@ const Register: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Check className="w-5 h-5 text-green-400" />
               <div className="text-sm text-green-100">
-                <p className="font-semibold">Account Created Successfully!</p>
-                <p>Redirecting to login page...</p>
+                <p className="font-semibold">Account Created and Verified Successfully!</p>
+                <p>Redirecting to dashboard...</p>
               </div>
             </div>
           </div>
@@ -191,6 +272,46 @@ const Register: React.FC = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              
+              {/* Password Strength Indicator */}
+              {formData.password && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center space-x-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasMinLength ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                    <span className={passwordStrength.hasMinLength ? 'text-green-400' : 'text-gray-400'}>
+                      At least 8 characters
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasUppercase ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                    <span className={passwordStrength.hasUppercase ? 'text-green-400' : 'text-gray-400'}>
+                      One uppercase letter (A-Z)
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasLowercase ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                    <span className={passwordStrength.hasLowercase ? 'text-green-400' : 'text-gray-400'}>
+                      One lowercase letter (a-z)
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasNumber ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                    <span className={passwordStrength.hasNumber ? 'text-green-400' : 'text-gray-400'}>
+                      One number (0-9)
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasSpecialChar ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                    <span className={passwordStrength.hasSpecialChar ? 'text-green-400' : 'text-gray-400'}>
+                      One special character (!@#$%^&*)
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              <p className="mt-1 text-xs text-gray-400">
+                Password must meet all requirements above.
+              </p>
               {errors.password && <p className="mt-1 text-sm text-red-400">{errors.password}</p>}
             </div>
 

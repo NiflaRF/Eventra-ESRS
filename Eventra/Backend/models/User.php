@@ -311,5 +311,44 @@ class User {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row['count'];
     }
+    
+    /**
+     * Mark user's email as verified
+     */
+    public function markEmailAsVerified() {
+        $query = "UPDATE " . $this->table_name . " SET is_email_verified = 1 WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $this->id);
+        return $stmt->execute();
+    }
+    
+    /**
+     * Check if user's email is verified
+     */
+    public function isEmailVerified() {
+        $query = "SELECT is_email_verified FROM " . $this->table_name . " WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $this->id);
+        $stmt->execute();
+        
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (bool)$row['is_email_verified'] : false;
+    }
+    
+    /**
+     * Check if email exists but is not verified
+     */
+    public function emailExistsButUnverified($email) {
+        $query = "SELECT id, is_email_verified FROM " . $this->table_name . " WHERE email = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $email);
+        $stmt->execute();
+        
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            return !$row['is_email_verified'];
+        }
+        return false;
+    }
 }
 ?> 

@@ -1,25 +1,47 @@
 <?php
 /**
- * Register API Endpoint
+ * Register API Endpoint with OTP Email Verification
  * Eventra ESRS Backend
  */
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Set content type to JSON
+header('Content-Type: application/json');
 
 require_once '../../config/cors.php';
 require_once '../../config/database.php';
 require_once '../../models/User.php';
-require_once '../../utils/JWTUtil.php';
+require_once '../../services/OTPService.php';
+require_once '../../utils/PasswordResetUtil.php';
+
+try {
 
 // Get database connection
 $database = new Database();
 $db = $database->getConnection();
 
-// Initialize user object
+// Initialize user object and OTP service
 $user = new User($db);
+$otpService = new OTPService($db);
 
 // Get posted data
 $data = json_decode(file_get_contents("php://input"));
 
 if(!empty($data->name) && !empty($data->email) && !empty($data->password) && !empty($data->role)) {
+    
+    // Validate password security requirements
+    $passwordValidation = PasswordResetUtil::validatePassword($data->password);
+    if (!$passwordValidation['success']) {
+        http_response_code(400);
+        echo json_encode(array(
+            "success" => false,
+            "message" => $passwordValidation['message']
+        ));
+        exit();
+    }
     
     // Check if role is allowed for public registration
     $public_roles = ['student', 'faculty'];
@@ -32,80 +54,52 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password) && !em
         exit();
     }
     
-    // Set user property values
-    $user->name = $data->name;
+    // Check if email already exists and is verified
     $user->email = $data->email;
-    $user->password_hash = password_hash($data->password, PASSWORD_DEFAULT);
-    $user->role = $data->role;
-    $user->department = $data->department ?? null;
-    $user->faculty = $data->faculty ?? null;
-    $user->designation = $data->designation ?? null;
-    $user->bio = $data->bio ?? null;
-    $user->event_interests = $data->event_interests ?? null;
-    $user->service_type = null; // Only for service-provider
-    $user->status = 'active';
-    $user->is_email_verified = false;
-    
-    // Check if email already exists
     if($user->emailExists()) {
-        http_response_code(409);
-        echo json_encode(array(
-            "success" => false,
-            "message" => "An account with this email already exists."
-        ));
-        exit();
+        // Check if the existing user has verified email
+        if($user->readByEmail() && $user->is_email_verified) {
+            http_response_code(409);
+            echo json_encode(array(
+                "success" => false,
+                "message" => "An account with this email already exists and is verified."
+            ));
+            exit();
+        }
     }
     
-    // Create the user
-    if($user_id = $user->create()) {
-        
-        // Get the created user data
-        $user->id = $user_id;
-        $user->readOne();
-        
-        // Create token payload
-        $payload = array(
-            "user_id" => $user->id,
-            "email" => $user->email,
-            "name" => $user->name,
-            "role" => $user->role,
-            "exp" => time() + (24 * 60 * 60) // 24 hours
-        );
-        
-        // Generate JWT token
-        $token = JWTUtil::generateToken($payload);
-        
-        // Create response data
-        $response_data = array(
+    // Prepare user data for OTP verification
+    $userData = [
+        'name' => htmlspecialchars($data->name),
+        'email' => htmlspecialchars($data->email),
+        'password_hash' => password_hash($data->password, PASSWORD_DEFAULT),
+        'role' => htmlspecialchars($data->role),
+        'department' => htmlspecialchars($data->department ?? ''),
+        'faculty' => htmlspecialchars($data->faculty ?? ''),
+        'designation' => htmlspecialchars($data->designation ?? ''),
+        'bio' => htmlspecialchars($data->bio ?? ''),
+        'event_interests' => htmlspecialchars($data->event_interests ?? ''),
+        'service_type' => null // Only for service-provider
+    ];
+    
+    // Send OTP for email verification
+    $result = $otpService->sendRegistrationOTP($data->email, $userData);
+    
+    if($result['success']) {
+        // Set response code - 200 OK (OTP sent, but registration not complete)
+        http_response_code(200);
+        echo json_encode(array(
             "success" => true,
-            "message" => "User registered successfully",
-            "token" => $token,
-            "user" => array(
-                "id" => $user->id,
-                "name" => $user->name,
-                "email" => $user->email,
-                "role" => $user->role,
-                "department" => $user->department,
-                "faculty" => $user->faculty,
-                "designation" => $user->designation,
-                "bio" => $user->bio,
-                "event_interests" => $user->event_interests,
-                "service_type" => $user->service_type,
-                "status" => $user->status,
-                "is_email_verified" => $user->is_email_verified
-            )
-        );
-        
-        // Set response code - 201 Created
-        http_response_code(201);
-        echo json_encode($response_data);
-        
+            "message" => $result['message'],
+            "step" => "otp_verification",
+            "email" => $data->email
+        ));
     } else {
-        // Set response code - 503 Service unavailable
-        http_response_code(503);
+        // Set response code - 400 Bad request
+        http_response_code(400);
         echo json_encode(array(
             "success" => false,
-            "message" => "Unable to register user."
+            "message" => $result['message']
         ));
     }
     
@@ -115,6 +109,15 @@ if(!empty($data->name) && !empty($data->email) && !empty($data->password) && !em
     echo json_encode(array(
         "success" => false,
         "message" => "Unable to register user. Data is incomplete."
+    ));
+}
+
+} catch (Exception $e) {
+    error_log("Registration Error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(array(
+        "success" => false,
+        "message" => "Internal server error occurred during registration."
     ));
 }
 ?> 

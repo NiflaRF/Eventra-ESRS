@@ -27,6 +27,18 @@ if(!empty($data->email) && !empty($data->password)) {
             
             if($user->status === 'active') {
                 
+                // Check if email is verified
+                if(!$user->is_email_verified) {
+                    http_response_code(403);
+                    echo json_encode(array(
+                        "success" => false,
+                        "message" => "Please verify your email address before logging in. Check your inbox for the verification code.",
+                        "email_not_verified" => true,
+                        "email" => $user->email
+                    ));
+                    exit();
+                }
+                
                 $payload = array(
                     "user_id" => $user->id,
                     "email" => $user->email,

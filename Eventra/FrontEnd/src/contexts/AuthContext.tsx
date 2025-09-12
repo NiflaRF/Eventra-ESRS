@@ -143,12 +143,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiService.register(userData);
       
       if (response.success) {
-        console.log('Registration successful:', response.user);
+        console.log('Registration step completed:', response);
         
-        localStorage.removeItem('eventra_user');
-        localStorage.removeItem('eventra_token');
-        setUser(null);
-        setIsAuthenticated(false);
+        // For OTP flow, don't set authentication state yet
+        // User will be authenticated after email verification
+        if (response.step === 'otp_verification') {
+          return true; // Indicates OTP was sent successfully
+        }
+        
+        // Fallback for immediate registration (if OTP is disabled)
+        if (response.user && response.token) {
+          const userData: User = {
+            id: response.user.id.toString(),
+            name: response.user.name,
+            email: response.user.email,
+            role: response.user.role as User['role'],
+            serviceType: response.user.service_type as User['serviceType'],
+          };
+          
+          setUser(userData);
+          setIsAuthenticated(true);
+          localStorage.setItem('eventra_user', JSON.stringify(userData));
+          localStorage.setItem('eventra_token', response.token);
+        }
         
         return true;
       } else {

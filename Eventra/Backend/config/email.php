@@ -43,6 +43,17 @@ class EmailService {
                 $this->mailer->SMTPSecure = $this->config['smtp_encryption'];
                 $this->mailer->Port = $this->config['smtp_port'];
                 
+                // Performance optimizations
+                $this->mailer->SMTPKeepAlive = true; // Keep connection alive for multiple emails
+                $this->mailer->Timeout = 30; // 30 seconds timeout
+                $this->mailer->SMTPOptions = array(
+                    'ssl' => array(
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                        'allow_self_signed' => true
+                    )
+                );
+                
                 $this->mailer->setFrom($this->config['from_email'], $this->config['from_name']);
                 $this->mailer->isHTML(true);
                 $this->mailer->CharSet = 'UTF-8';

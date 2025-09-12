@@ -17,12 +17,21 @@ export interface LoginResponse {
 export interface RegisterResponse {
   success: boolean;
   message: string;
+  step?: string; // For OTP verification flow
+  email?: string; // Email for OTP verification
   user?: {
     id: number;
     name: string;
     email: string;
     role: string;
+    service_type?: string;
     status: string;
+    department?: string;
+    faculty?: string;
+    designation?: string;
+    bio?: string;
+    event_interests?: string;
+    is_email_verified?: boolean;
   };
   token?: string;
 }
@@ -112,11 +121,42 @@ class ApiService {
 
     const data = await this.handleResponse<RegisterResponse>(response);
     
-    if (data.success && data.token) {
-      localStorage.setItem('eventra_token', data.token);
+    // For OTP flow, we don't store token immediately
+    // Token is stored only after email verification
+    
+    return data;
+  }
+
+  async verifyEmail(email: string, otp: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, otp }),
+    });
+
+    const data = await this.handleResponse(response);
+    
+    if (data && typeof data === 'object' && 'success' in data && 'token' in data) {
+      if ((data as any).success && (data as any).token) {
+        localStorage.setItem('eventra_token', (data as any).token);
+      }
     }
     
     return data;
+  }
+
+  async resendOTP(email: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/auth/resend-otp.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    return this.handleResponse(response);
   }
 
   async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
