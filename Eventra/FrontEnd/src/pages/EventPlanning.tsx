@@ -92,6 +92,7 @@ const EventPlanning: React.FC = () => {
             }
           } catch (e) {
             console.warn('Failed to parse facilities for plan:', plan.id, e);
+            console.warn('Raw facilities value:', plan.facilities);
             facilities = [];
           }
           

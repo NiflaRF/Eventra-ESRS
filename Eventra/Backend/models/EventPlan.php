@@ -51,9 +51,9 @@ class EventPlan {
         $this->title = htmlspecialchars($this->title ?? '');
         $this->organizer = htmlspecialchars($this->organizer ?? '');
         $this->remarks = htmlspecialchars($this->remarks ?? '');
-        $this->facilities = $this->facilities ? json_encode($this->facilities) : null;
-        $this->documents = $this->documents ? json_encode($this->documents) : null;
-        $this->approval_documents = $this->approval_documents ? json_encode($this->approval_documents) : null;
+        $this->facilities = is_array($this->facilities) ? json_encode($this->facilities) : $this->facilities;
+        $this->documents = is_array($this->documents) ? json_encode($this->documents) : $this->documents;
+        $this->approval_documents = is_array($this->approval_documents) ? json_encode($this->approval_documents) : $this->approval_documents;
 
         $stmt->bindParam(":user_id", $this->user_id);
         $stmt->bindParam(":title", $this->title);
