@@ -46,7 +46,6 @@ interface User {
   email: string;
   role: 'student' | 'faculty' | 'service-provider' | 'super-admin' | 'vice-chancellor' | 'administration' | 'student-union' | 'warden';
   status: 'active' | 'inactive';
-  joinDate: string;
 }
 
 interface PendingApproval {
@@ -1053,32 +1052,104 @@ const AdminTools: React.FC = () => {
     }
   };
 
-  const handleUserSubmit = (e: React.FormEvent) => {
+  const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingUser) {
-      // Update existing user
-      setUsers(users.map(user => 
-        user.id === editingUser.id 
-          ? { ...editingUser, ...newUser }
-          : user
-      ));
-    } else {
-      // Add new user
-      const user: User = {
-        id: Date.now().toString(),
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        status: newUser.status,
-        joinDate: new Date().toISOString().split('T')[0]
-      };
-      setUsers([...users, user]);
+    try {
+      if (editingUser) {
+        // Update existing user - call API to persist to database
+        console.log('Updating user:', editingUser.id, newUser);
+        
+        const response = await apiService.updateUser(editingUser.id, {
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          status: newUser.status
+        });
+        
+        if (response.success) {
+          console.log('User updated successfully:', response.user);
+          
+          // Update the local state with the updated user data
+          setUsers(users.map(user => 
+            user.id === editingUser.id 
+              ? { 
+                  ...user, 
+                  name: response.user.name || newUser.name,
+                  email: response.user.email || newUser.email,
+                  role: response.user.role || newUser.role,
+                  status: response.user.status || newUser.status
+                }
+              : user
+          ));
+          
+          // Show success message
+          alert('User updated successfully!');
+          
+          // Close modal and reset form
+          setShowUserForm(false);
+          setEditingUser(null);
+          setNewUser({ name: '', email: '', role: 'student', status: 'active' });
+        } else {
+          console.error('Failed to update user:', response.message);
+          alert('Failed to update user: ' + response.message);
+        }
+      } else {
+        // Add new user - call API to persist to database
+        console.log('Creating new user:', newUser);
+        
+        const response = await apiService.createUser({
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          status: newUser.status,
+          password: 'default123' // Always use default password
+        });
+        
+        if (response.success && response.user) {
+          console.log('User created successfully:', response.user);
+          
+          // Add the new user to the local state with the server-generated ID
+          const user: User = {
+            id: response.user.id ? response.user.id.toString() : Date.now().toString(),
+            name: response.user.name || newUser.name,
+            email: response.user.email || newUser.email,
+            role: response.user.role || newUser.role,
+            status: response.user.status || newUser.status
+          };
+          setUsers([...users, user]);
+          
+          // Show success message
+          alert('User created successfully!');
+          
+          // Close modal and reset form
+          setShowUserForm(false);
+          setEditingUser(null);
+          setNewUser({ name: '', email: '', role: 'student', status: 'active' });
+        } else {
+          console.error('Failed to create user:', response.message || 'Unknown error');
+          alert('Failed to create user: ' + (response.message || 'Unknown error'));
+        }
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Show user-friendly error messages
+      if (errorMessage.includes('Email already exists')) {
+        alert('Error: This email address is already registered. Please use a different email.');
+      } else if (errorMessage.includes('Failed to parse response')) {
+        alert('Error: Unable to communicate with server. Please check your connection and try again.');
+      } else {
+        alert('Error creating user: ' + errorMessage);
+      }
+      
+      // Don't close the modal so user can fix the error and try again
     }
-    
-    setShowUserForm(false);
-    setEditingUser(null);
-    setNewUser({ name: '', email: '', role: 'student', status: 'active' });
   };
 
   const handleEditUser = (user: User) => {
@@ -1092,18 +1163,70 @@ const AdminTools: React.FC = () => {
     setShowUserForm(true);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(u => u.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      try {
+        console.log('Deleting user:', userId);
+        
+        const response = await apiService.deleteUser(userId);
+        
+        if (response.success) {
+          // Remove user from local state only after successful API call
+          setUsers(users.filter(u => u.id !== userId));
+          alert('User deleted successfully!');
+        } else {
+          console.error('Failed to delete user:', response.message);
+          alert('Failed to delete user: ' + response.message);
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        let errorMessage = 'Unknown error occurred';
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
+        alert('Error deleting user: ' + errorMessage);
+      }
     }
   };
 
-  const toggleUserStatus = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-        : user
-    ));
+  const toggleUserStatus = async (userId: string) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+      
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      
+      console.log(`Toggling user ${userId} status to:`, newStatus);
+      
+      const response = await apiService.updateUser(userId, {
+        status: newStatus
+      });
+      
+      if (response.success) {
+        // Update local state only after successful API call
+        setUsers(users.map(u => 
+          u.id === userId 
+            ? { ...u, status: newStatus }
+            : u
+        ));
+        
+        alert(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
+      } else {
+        console.error('Failed to update user status:', response.message);
+        alert('Failed to update user status: ' + response.message);
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      alert('Error updating user status: ' + errorMessage);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -1263,7 +1386,6 @@ const AdminTools: React.FC = () => {
                 <th className="text-left py-3 px-6 font-medium text-white">User</th>
                 <th className="text-left py-3 px-6 font-medium text-white">Role</th>
                 <th className="text-left py-3 px-6 font-medium text-white">Status</th>
-                <th className="text-left py-3 px-6 font-medium text-white">Join Date</th>
                 <th className="text-left py-3 px-6 font-medium text-white">Actions</th>
               </tr>
             </thead>
@@ -1296,9 +1418,6 @@ const AdminTools: React.FC = () => {
                     <span className={`px-3 py-1 rounded-full text-xs font-medium border ${user.status === 'active' ? 'bg-green-900/60 text-green-200 border-green-500/30' : user.status === 'inactive' ? 'bg-red-900/60 text-red-200 border-red-500/30' : 'bg-yellow-900/60 text-yellow-200 border-yellow-500/30'}`}>
                       {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
                     </span>
-                  </td>
-                  <td className="py-4 px-6 text-sm text-white/70">
-                    {user.joinDate}
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex space-x-2">

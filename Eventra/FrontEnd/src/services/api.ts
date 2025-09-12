@@ -46,13 +46,19 @@ class ApiService {
     console.log('Raw response text:', responseText);
     
     try {
-      // Try to find JSON in the response (in case there's HTML output before JSON)
-      const jsonMatch = responseText.match(/\{.*\}/s);
-      const jsonText = jsonMatch ? jsonMatch[0] : responseText;
+      // Try to parse the response as JSON directly first
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        // If direct parsing fails, try to find JSON in the response
+        const jsonMatch = responseText.match(/\{.*\}/s);
+        const jsonText = jsonMatch ? jsonMatch[0] : responseText;
+        data = JSON.parse(jsonText);
+      }
       
-      const data = JSON.parse(jsonText);
-      
-      if (!response.ok) {
+      // Check if the response indicates an error (either from HTTP status or success field)
+      if (!response.ok || (data.success === false)) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       
@@ -61,6 +67,12 @@ class ApiService {
       console.error('Response parsing error:', error);
       console.error('Response status:', response.status);
       console.error('Response text:', responseText);
+      
+      // If it's a known error with a message, throw that
+      if (error instanceof Error && error.message !== 'Failed to parse response from server') {
+        throw error;
+      }
+      
       throw new Error('Failed to parse response from server');
     }
   }
@@ -273,6 +285,91 @@ class ApiService {
     });
 
     return this.handleResponse(response);
+  }
+
+  async createUser(userData: {
+    name: string;
+    email: string;
+    role: string;
+    status?: string;
+    password?: string;
+  }): Promise<any> {
+    try {
+      console.log('Creating user:', userData);
+      
+      const response = await fetch(`${API_BASE_URL}/users/create.php`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          status: userData.status || 'active',
+          password: userData.password || 'default123'
+        }),
+      });
+
+      console.log('Create user response status:', response.status);
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error in createUser:', error);
+      throw error;
+    }
+  }
+
+  async updateUser(userId: string, userData: {
+    name?: string;
+    email?: string;
+    role?: string;
+    status?: string;
+    department?: string;
+    faculty?: string;
+    designation?: string;
+    bio?: string;
+    event_interests?: string;
+    service_type?: string;
+  }): Promise<any> {
+    try {
+      console.log('Updating user:', userId, userData);
+      
+      const response = await fetch(`${API_BASE_URL}/users/update.php`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          id: userId,
+          ...userData
+        }),
+      });
+
+      console.log('Update user response status:', response.status);
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error in updateUser:', error);
+      throw error;
+    }
+  }
+
+  async deleteUser(userId: string): Promise<any> {
+    try {
+      console.log('Deleting user:', userId);
+      
+      const response = await fetch(`${API_BASE_URL}/users/delete.php`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          id: userId
+        }),
+      });
+
+      console.log('Delete user response status:', response.status);
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error in deleteUser:', error);
+      throw error;
+    }
   }
 
   // Logout

@@ -45,7 +45,10 @@ if (!empty($data->name) && !empty($data->email) && !empty($data->role)) {
     $user->password_hash = password_hash($data->password ?? 'default123', PASSWORD_DEFAULT);
     $user->is_email_verified = false;
     
-    if ($user->create()) {
+    $user_id = $user->create();
+    if ($user_id) {
+        $user->id = $user_id; // Assign the created ID back to the user object
+        
         $logger = new ActivityLogger();
         $logger->logUserCreated($payload['user_id'], $user->id, $data->email, $_SERVER['REMOTE_ADDR'] ?? 'unknown');
         
