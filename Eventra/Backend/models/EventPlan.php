@@ -51,9 +51,34 @@ class EventPlan {
         $this->title = htmlspecialchars($this->title ?? '');
         $this->organizer = htmlspecialchars($this->organizer ?? '');
         $this->remarks = htmlspecialchars($this->remarks ?? '');
-        $this->facilities = is_array($this->facilities) ? json_encode($this->facilities) : $this->facilities;
-        $this->documents = is_array($this->documents) ? json_encode($this->documents) : $this->documents;
-        $this->approval_documents = is_array($this->approval_documents) ? json_encode($this->approval_documents) : $this->approval_documents;
+        
+        // Handle array/object to JSON conversion properly
+        if (is_array($this->facilities) || is_object($this->facilities)) {
+            $this->facilities = json_encode($this->facilities);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->facilities = '[]';
+            }
+        } else {
+            $this->facilities = $this->facilities ?? '[]';
+        }
+        
+        if (is_array($this->documents) || is_object($this->documents)) {
+            $this->documents = json_encode($this->documents);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->documents = '[]';
+            }
+        } else {
+            $this->documents = $this->documents ?? '[]';
+        }
+        
+        if (is_array($this->approval_documents) || is_object($this->approval_documents)) {
+            $this->approval_documents = json_encode($this->approval_documents);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->approval_documents = '{}';
+            }
+        } else {
+            $this->approval_documents = $this->approval_documents ?? '{}';
+        }
 
         $stmt->bindParam(":user_id", $this->user_id);
         $stmt->bindParam(":title", $this->title);
@@ -153,9 +178,29 @@ class EventPlan {
             $this->participants = $row['participants'];
             $this->status = $row['status'];
             $this->current_stage = $row['current_stage'];
-            $this->facilities = $row['facilities'] ? json_decode($row['facilities'], true) : null;
-            $this->documents = $row['documents'] ? json_decode($row['documents'], true) : null;
-            $this->approval_documents = $row['approval_documents'] ? json_decode($row['approval_documents'], true) : null;
+            
+            // Safely decode JSON fields with error handling
+            if ($row['facilities']) {
+                $decoded_facilities = json_decode($row['facilities'], true);
+                $this->facilities = (json_last_error() === JSON_ERROR_NONE) ? $decoded_facilities : [];
+            } else {
+                $this->facilities = [];
+            }
+            
+            if ($row['documents']) {
+                $decoded_documents = json_decode($row['documents'], true);
+                $this->documents = (json_last_error() === JSON_ERROR_NONE) ? $decoded_documents : [];
+            } else {
+                $this->documents = [];
+            }
+            
+            if ($row['approval_documents']) {
+                $decoded_approval_docs = json_decode($row['approval_documents'], true);
+                $this->approval_documents = (json_last_error() === JSON_ERROR_NONE) ? $decoded_approval_docs : [];
+            } else {
+                $this->approval_documents = [];
+            }
+            
             $this->remarks = $row['remarks'];
             $this->created_at = $row['created_at'];
             $this->updated_at = $row['updated_at'];

@@ -37,14 +37,13 @@ if (!empty($data->title) && !empty($data->type) && !empty($data->organizer) && !
     $eventPlan->current_stage = 1;
     $eventPlan->facilities = $data->facilities ?? [];
     $eventPlan->documents = $data->documents ?? [];
-    $eventPlan->approval_documents = $data->approval_documents ?? null;
+    $eventPlan->approval_documents = $data->approval_documents ?? [];
     $eventPlan->remarks = $data->remarks ?? '';
 
     $event_plan_id = $eventPlan->create();
     
     if ($event_plan_id) {
-        $eventPlan->id = $event_plan_id;
-        $eventPlan->readOne();
+        // Removed readOne() call that was causing stdClass conversion issues
         
         $notification->createAdminNotification(
             $payload['user_id'],
