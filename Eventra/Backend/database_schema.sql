@@ -263,25 +263,19 @@ CREATE TABLE event_feedback (
     INDEX idx_rating (rating)
 );
 
-INSERT INTO users (name, email, password_hash, role, status, is_email_verified) 
-VALUES ('Super Administrator', 'superadmin@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super-admin', 'active', TRUE);
-
-INSERT INTO venues (name, capacity, location, type, availability, restrictions, images) VALUES
-('E Block Main Auditorium', 500, 'Academic Block E', 'Auditorium', 'Available', 'No food and drinks allowed', '["/E1.jpg"]'),
-('Technology Lecture Theater 1', 250, 'Technology Building', 'Lecture Theater', 'Available', 'Professional events only', '["/Tecno.jpg"]'),
-('Open Ground', 1000, 'Campus Premises', 'Outdoor', 'Available', 'Weather dependent', '["/Ground.jpg"]'),
-('Namunukula Open Air Theater', 700, 'Campus Center', 'Outdoor', 'Available', 'Weather dependent', '["/Open Air Theater.jpg"]');
-
-INSERT INTO users (name, email, password_hash, role, service_type, status, is_email_verified) VALUES
-('Sound Pro', 'soundpro@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'service-provider', 'Sound System', 'active', TRUE),
-('UvaRayon Media', 'uvarayonmedia@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'service-provider', 'Media', 'active', TRUE);
-
-INSERT INTO users (name, email, password_hash, role, status, is_email_verified) VALUES
-('Vice Chancellor', 'vicechancellor@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'vice-chancellor', 'active', TRUE),
-('Administration of UWU', 'administrationuwu@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'administration', 'active', TRUE),
-('Student Union', 'studentunion@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'student-union', 'active', TRUE),
-('Warden', 'warden@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'warden', 'active', TRUE);
-
-INSERT INTO users (name, email, password_hash, role, department, status, is_email_verified) VALUES
-('Amal', 'amal@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'student', 'Computer Science', 'active', TRUE),
-('FAS', 'fas@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'faculty', 'Computer Science and Informatics', 'active', TRUE);
+CREATE TABLE IF NOT EXISTS `contact_messages` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `status` ENUM('unread', 'read', 'replied') DEFAULT 'unread',
+  `priority` ENUM('low', 'medium', 'high') DEFAULT 'medium',
+  `replied_by` INT DEFAULT NULL,
+  `reply_message` TEXT DEFAULT NULL,
+  `replied_at` TIMESTAMP NULL DEFAULT NULL,
+  `ip_address` VARCHAR(45) DEFAULT NULL,
+  `user_agent` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
