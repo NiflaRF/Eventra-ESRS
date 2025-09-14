@@ -4,7 +4,7 @@ import apiService from '../../services/api';
 
 interface OTPVerificationProps {
   email: string;
-  onVerificationSuccess: (userData: any, token: string) => void;
+  onVerificationSuccess: (userData: any | null, token: string | null) => void;
   onBackToRegistration: () => void;
 }
 
@@ -87,7 +87,13 @@ const OTPVerification: React.FC<OTPVerificationProps> = ({
       if (response.success) {
         setSuccess('Email verified successfully!');
         setTimeout(() => {
-          onVerificationSuccess(response.user, response.token);
+          // Check if response indicates redirect to login
+          if (response.redirect_to_login) {
+            onVerificationSuccess(null, null); // Pass null to indicate redirect to login
+          } else {
+            // Legacy: still support auto-login if token is provided
+            onVerificationSuccess(response.user, response.token);
+          }
         }, 1000);
       } else {
         setError(response.message || 'Invalid verification code');

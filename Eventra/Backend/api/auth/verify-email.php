@@ -40,43 +40,14 @@ try {
         error_log("OTP Verification Result: " . json_encode($result));
         
         if ($result['success']) {
-            // Get the created user data for token generation
-            require_once '../../models/User.php';
-            $user = new User($db);
-            $user->id = $result['user_id'];
-            $user->readOne();
+            // Email verification successful - user should now login
+            // Don't auto-login, redirect to login page instead
             
-            // Create token payload
-            $payload = array(
-                "user_id" => $user->id,
-                "email" => $user->email,
-                "name" => $user->name,
-                "role" => $user->role,
-                "exp" => time() + (24 * 60 * 60) // 24 hours
-            );
-            
-            // Generate JWT token
-            $token = JWTUtil::generateToken($payload);
-            
-            // Create response data
+            // Create response data without token
             $response_data = array(
                 "success" => true,
-                "message" => $result['message'],
-                "token" => $token,
-                "user" => array(
-                    "id" => $user->id,
-                    "name" => $user->name,
-                    "email" => $user->email,
-                    "role" => $user->role,
-                    "department" => $user->department,
-                    "faculty" => $user->faculty,
-                    "designation" => $user->designation,
-                    "bio" => $user->bio,
-                    "event_interests" => $user->event_interests,
-                    "service_type" => $user->service_type,
-                    "status" => $user->status,
-                    "is_email_verified" => $user->is_email_verified
-                )
+                "message" => "Email verified successfully! Please login to continue.",
+                "redirect_to_login" => true
             );
             
             // Set response code - 201 Created

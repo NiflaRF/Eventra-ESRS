@@ -393,23 +393,7 @@ const EventPlanning: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-gray-800/70 border border-gray-700 rounded-lg p-4">
-              <h4 className="font-medium text-white mb-2">Facility Availability Status</h4>
-              <div className="space-y-2">
-                {eventPlan.facilities && eventPlan.facilities.length > 0 ? (
-                  eventPlan.facilities.map((facility) => (
-                    <div key={facility} className="flex items-center justify-between text-sm text-white">
-                      <span>{facility}</span>
-                      <span className="px-2 py-1 bg-green-700 text-white rounded text-xs">
-                        ✅ Available
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-gray-400 text-sm">No facilities selected</div>
-                )}
-              </div>
-            </div>
+
           </div>
         );
 

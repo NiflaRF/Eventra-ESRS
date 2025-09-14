@@ -130,11 +130,20 @@ const Register: React.FC = () => {
     }
   };
 
-  const handleOTPVerificationSuccess = (userData: any, token: string) => {
-    setShowSuccess(true);
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1500);
+  const handleOTPVerificationSuccess = (userData: any | null, token: string | null) => {
+    // Check if we should redirect to login (new behavior)
+    if (userData === null && token === null) {
+      setShowSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 1500);
+    } else {
+      // Legacy: auto-login behavior (if still supported)
+      setShowSuccess(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+    }
   };
 
   const handleBackToRegistration = () => {
@@ -199,7 +208,7 @@ const Register: React.FC = () => {
               <Check className="w-5 h-5 text-green-400" />
               <div className="text-sm text-green-100">
                 <p className="font-semibold">Account Created and Verified Successfully!</p>
-                <p>Redirecting to dashboard...</p>
+                <p>Redirecting to login page...</p>
               </div>
             </div>
           </div>

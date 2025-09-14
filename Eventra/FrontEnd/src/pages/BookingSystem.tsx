@@ -52,10 +52,15 @@ const BookingSystem: React.FC = () => {
 
   // Dummy venues for booking (keeping the 4 original venues)
   const availableVenues = [
-    { id: '1', name: 'E BlockMain Auditorium', capacity: 500, available: true },
-    { id: '2', name: 'Technology Lecture Theater', capacity: 250, available: false },
-    { id: '3', name: 'Open Ground', capacity: 1000, available: true },
-    { id: '4', name: 'Namunukula Open Air Theater', capacity: 700, available: true }
+    { id: '1', name: 'E BlockMain Auditorium', capacity: 700, available: true },
+    { id: '2', name: 'Technology Lecture Theater 1', capacity: 300, booked: true },
+    { id: '3', name: 'Open Ground', capacity: 4000, available: true },
+    { id: '4', name: 'Namunukula Open Air Theater', capacity: 1000, available: true },
+    { id: '5', name: 'E3 Computer Lab', capacity: 150, maintenance: true },
+    { id: '6', name: 'Main Computer Lab', capacity: 150, available: true },
+    { id: '7', name: 'MCL Car Park', capacity: 1000, available: true },
+    { id: '8', name: 'E1 Hall', capacity: 800, available: true },
+    { id: '9', name: 'Main Lecture Theater', capacity: 2000, available: true }
   ];
 
   const availableFacilities = [

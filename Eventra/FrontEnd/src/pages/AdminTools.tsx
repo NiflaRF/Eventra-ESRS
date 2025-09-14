@@ -122,9 +122,7 @@ const AdminTools: React.FC = () => {
   const [isLoadingSystemLogs, setIsLoadingSystemLogs] = useState(false);
   const [systemLogsFilters, setSystemLogsFilters] = useState({
     type: '',
-    user_id: null as number | null,
-    start_date: '',
-    end_date: ''
+    user_id: null as number | null
   });
   const [isNotificationPopupOpen, setIsNotificationPopupOpen] = useState(false);
   const [showFilePreviewModal, setShowFilePreviewModal] = useState(false);
@@ -271,8 +269,6 @@ const AdminTools: React.FC = () => {
       
       if (systemLogsFilters.type) params.type = systemLogsFilters.type;
       if (systemLogsFilters.user_id) params.user_id = systemLogsFilters.user_id;
-      if (systemLogsFilters.start_date) params.start_date = systemLogsFilters.start_date;
-      if (systemLogsFilters.end_date) params.end_date = systemLogsFilters.end_date;
       
       const response = await apiService.getSystemLogs(params);
       
@@ -1770,7 +1766,6 @@ const AdminTools: React.FC = () => {
               <option value="event_plan">Event Plan</option>
               <option value="venue">Venue</option>
               <option value="user">User</option>
-              <option value="system">System</option>
             </select>
           </div>
           
@@ -1791,25 +1786,7 @@ const AdminTools: React.FC = () => {
             </select>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">Start Date</label>
-            <input
-              type="date"
-              value={systemLogsFilters.start_date}
-              onChange={(e) => setSystemLogsFilters(prev => ({ ...prev, start_date: e.target.value }))}
-              className="w-full bg-black/60 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">End Date</label>
-            <input
-              type="date"
-              value={systemLogsFilters.end_date}
-              onChange={(e) => setSystemLogsFilters(prev => ({ ...prev, end_date: e.target.value }))}
-              className="w-full bg-black/60 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+
         </div>
         
         <div className="flex justify-end mt-4">
@@ -1817,9 +1794,7 @@ const AdminTools: React.FC = () => {
             onClick={() => {
               setSystemLogsFilters({
                 type: '',
-                user_id: null,
-                start_date: '',
-                end_date: ''
+                user_id: null
               });
             }}
             className="bg-gray-600/80 hover:bg-gray-700/80 text-white px-4 py-2 rounded-lg transition-colors"

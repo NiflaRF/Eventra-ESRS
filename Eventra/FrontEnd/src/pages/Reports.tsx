@@ -23,8 +23,6 @@ const Reports: React.FC = () => {
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
-  const [eventTypeFilter, setEventTypeFilter] = useState('all');
-  const [venueFilter, setVenueFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('overview');
 
   // Real data state
@@ -46,9 +44,7 @@ const Reports: React.FC = () => {
       setError(null);
       const response = await apiService.getEventStatistics({
         start_date: dateRange.start,
-        end_date: dateRange.end,
-        event_type: eventTypeFilter === 'all' ? undefined : eventTypeFilter,
-        venue_id: venueFilter === 'all' ? undefined : venueFilter
+        end_date: dateRange.end
       });
       setEventStats(response.data);
     } catch (err: any) {
@@ -77,8 +73,6 @@ const Reports: React.FC = () => {
       const response = await apiService.getEventReports({
         start_date: dateRange.start,
         end_date: dateRange.end,
-        event_type: eventTypeFilter === 'all' ? undefined : eventTypeFilter,
-        venue_id: venueFilter === 'all' ? undefined : venueFilter,
         offset: 0
       });
       setEventReports(response.data);
@@ -103,8 +97,7 @@ const Reports: React.FC = () => {
       setError(null);
       const response = await apiService.getVenueAnalytics({
         start_date: dateRange.start,
-        end_date: dateRange.end,
-        venue_id: venueFilter === 'all' ? undefined : venueFilter
+        end_date: dateRange.end
       });
       setVenueAnalytics(response.data);
     } catch (err: any) {
@@ -157,7 +150,7 @@ const Reports: React.FC = () => {
     fetchEventReports();
     fetchVenueAnalytics();
     fetchUserAnalytics();
-  }, [dateRange.start, dateRange.end, eventTypeFilter, venueFilter]);
+  }, [dateRange.start, dateRange.end]);
 
   // Initialize event types and venues on component mount
   useEffect(() => {
@@ -250,32 +243,6 @@ const Reports: React.FC = () => {
                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                     className="bg-black/60 backdrop-blur-sm text-white border border-white/20 rounded-xl py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/90 mb-2">Event Type</label>
-                  <select
-                    value={eventTypeFilter}
-                    onChange={(e) => setEventTypeFilter(e.target.value)}
-                    className="bg-black/60 backdrop-blur-sm text-white border border-white/20 rounded-xl py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    <option value="all">All Types</option>
-                    {eventTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/90 mb-2">Venue</label>
-                  <select
-                    value={venueFilter}
-                    onChange={(e) => setVenueFilter(e.target.value)}
-                    className="bg-black/60 backdrop-blur-sm text-white border border-white/20 rounded-xl py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    <option value="all">All Venues</option>
-                    {venues.map(venue => (
-                      <option key={venue} value={venue}>{venue}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
             </div>
