@@ -32,6 +32,10 @@ if ($payload['role'] !== 'super-admin') {
 
 $data = json_decode(file_get_contents("php://input"));
 
+// Debug: Log all incoming requests
+error_log("Super Admin Approve API - Incoming request: " . json_encode($data));
+error_log("Super Admin Approve API - User role: " . $payload['role']);
+
 if (!empty($data->event_plan_id) && !empty($data->action)) {
     $eventPlan->id = $data->event_plan_id;
     
@@ -47,7 +51,7 @@ if (!empty($data->event_plan_id) && !empty($data->action)) {
     // Initialize signed letter object for status checks
     $signedLetterObj = new SignedLetter($db);
     
-    if ($eventPlan->status !== 'submitted') {
+    if ($eventPlan->status !== 'submitted' && $eventPlan->status !== 'forwarded_to_service_provider') {
         // Special case: if status is 'rejected' due to service provider rejection, 
         // allow super-admin to still process but inform about rejection
         if ($eventPlan->status === 'rejected') {
@@ -68,7 +72,7 @@ if (!empty($data->event_plan_id) && !empty($data->action)) {
             }
         } else {
             // For debugging: Allow approval regardless of status and log what the status actually is
-            error_log("Super Admin Approval Warning - Event Plan ID: {$data->event_plan_id} has status '{$eventPlan->status}' instead of 'submitted', but allowing approval to proceed");
+            error_log("Super Admin Approval Warning - Event Plan ID: {$data->event_plan_id} has status '{$eventPlan->status}' instead of 'submitted' or 'forwarded_to_service_provider', but allowing approval to proceed");
             // Temporarily commenting out the strict status check
             // http_response_code(400);
             // echo json_encode(array("success" => false, "message" => "Event plan is not in submitted status"));
@@ -132,7 +136,14 @@ if (!empty($data->event_plan_id) && !empty($data->action)) {
         
         $eventPlan->status = 'approved';
     } else {
+        // Rejection action - no need to check approvals, super-admin can reject any event plan
+        error_log("Super Admin Rejection - Event Plan ID: {$data->event_plan_id} being rejected by super-admin");
         $eventPlan->status = 'rejected';
+        
+        // Add rejection comment to remarks if provided
+        if (!empty($data->comment)) {
+            $eventPlan->remarks = ($eventPlan->remarks ? $eventPlan->remarks . ' ' : '') . 'Super Admin Rejection: ' . $data->comment;
+        }
     }
     
     if ($eventPlan->update()) {

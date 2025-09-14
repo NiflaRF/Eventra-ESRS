@@ -57,7 +57,7 @@ interface PendingApproval {
   venue: string;
   date: string;
   details: string;
-  status: 'pending' | 'approved' | 'rejected' | 'submitted';
+  status: 'pending' | 'approved' | 'rejected' | 'submitted' | 'forwarded_to_service_provider';
   approvalLetters?: {
     vc: string;
     warden: string;
@@ -1481,10 +1481,10 @@ const AdminTools: React.FC = () => {
                                  (approvalQueueTab === 'event-planning' && approval.type === 'event-plan');
             
             // For bookings, check for 'pending' status
-            // For event plans, only show submitted status (exclude approved/rejected)
+            // For event plans, show submitted and forwarded_to_service_provider status (exclude approved/rejected)
             const isCorrectStatus = approval.type === 'booking' ? 
               approval.status === 'pending' : 
-              approval.status === 'submitted';
+              (approval.status === 'submitted' || approval.status === 'forwarded_to_service_provider');
             
             return isCorrectType && isCorrectStatus;
           })
@@ -1631,10 +1631,10 @@ const AdminTools: React.FC = () => {
                                  (approvalQueueTab === 'event-planning' && approval.type === 'event-plan');
             
             // For bookings, check for 'pending' status
-            // For event plans, only show submitted status (exclude approved/rejected)
+            // For event plans, show submitted and forwarded_to_service_provider status (exclude approved/rejected)
             const isCorrectStatus = approval.type === 'booking' ? 
               approval.status === 'pending' : 
-              approval.status === 'submitted';
+              (approval.status === 'submitted' || approval.status === 'forwarded_to_service_provider');
             
             return isCorrectType && isCorrectStatus;
           }).length === 0 && (

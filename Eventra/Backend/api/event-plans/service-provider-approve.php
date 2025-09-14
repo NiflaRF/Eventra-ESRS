@@ -54,11 +54,11 @@ if (!empty($data->event_plan_id) && !empty($data->action)) {
         $letter_content = $data->comment ?? "Event plan '{$eventPlan->title}' has been approved by Service Provider. All service requirements can be fulfilled.";
         error_log("Service Provider Approval: Event plan {$data->event_plan_id} approved by service provider. Status remains '{$eventPlan->status}' pending super-admin final decision.");
     } else {
-        // Service provider rejection - only change status to rejected for rejection case
-        $eventPlan->status = 'rejected';
-        $eventPlan->remarks = $data->comment ?? '';
+        // Service provider rejection - keep status as submitted so it remains in admin approval queue
+        // Don't change the status to 'rejected' automatically, let admin make the final decision
+        $eventPlan->remarks = ($eventPlan->remarks ? $eventPlan->remarks . ' ' : '') . 'Service Provider Rejection: ' . ($data->comment ?? '');
         $updateResult = $eventPlan->update();
-        error_log("Service Provider Rejection: Event plan {$data->event_plan_id} status updated to 'rejected'. Update result: " . ($updateResult ? 'success' : 'failed'));
+        error_log("Service Provider Rejection: Event plan {$data->event_plan_id} rejected by service provider. Status remains '{$eventPlan->status}' for admin review. Update result: " . ($updateResult ? 'success' : 'failed'));
         
         $letter_content = $data->comment ?? "Event plan '{$eventPlan->title}' has been rejected by Service Provider.";
     }
