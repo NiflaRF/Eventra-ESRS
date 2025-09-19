@@ -192,12 +192,7 @@ const Home = () => {
             <Link to="/terms" className="hover:underline text-white">Terms & Conditions</Link>
             <Link to="/privacy-policy" className="hover:underline text-white">Privacy & Policy</Link>
           </div>
-          <div className="mb-2 font-semibold text-white">Get in touch with us</div>
-          <div className="flex gap-4 justify-center text-2xl mb-2">
-            {socialLinks.map((s, idx) => (
-              <a key={idx} href={s.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-300 text-white">{s.icon}</a>
-            ))}
-          </div>
+          
           <div className="text-sm text-center text-white">&copy; 2025 Eventra. All rights reserved.</div>
         </div>
       </footer>
